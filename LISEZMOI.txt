@@ -1,0 +1,43 @@
+CARNET D'ÉCHECS : l'installer sur ton iPhone (sans ordinateur, gratuit)
+=======================================================================
+
+1. DÉZIPPER
+   - Dans l'app Fichiers, touche le fichier carnet-echecs-app.zip :
+     un dossier « carnet-echecs-app » apparaît à côté.
+
+2. CRÉER TON SITE SUR GITHUB (dans Safari)
+   - Va sur github.com et crée un compte gratuit.
+   - Touche « + » → « New repository ». Nom : carnet (par exemple).
+     Coche « Public », puis « Create repository ».
+   - Sur la page du dépôt, touche « uploading an existing file »
+     (ou « Add file » → « Upload files »).
+   - Touche « choose your files », va dans le dossier carnet-echecs-app
+     et sélectionne TOUS les fichiers : index.html, sw.js, manifest.webmanifest
+     et les 4 images .png (LISEZMOI.txt n'est pas nécessaire).
+   - En bas, touche « Commit changes ».
+
+3. ACTIVER LA PUBLICATION
+   - Dans le dépôt : « Settings » → « Pages ».
+   - Source : « Deploy from a branch ». Branch : « main », dossier « / (root) ».
+     Touche « Save ».
+   - Attends 1 à 2 minutes, recharge la page : l'adresse s'affiche,
+     du type https://tonpseudo.github.io/carnet/
+
+4. L'INSTALLER
+   - Ouvre cette adresse dans Safari → bouton Partager → « Sur l'écran d'accueil ».
+   - Vérifie que « Ouvrir en tant qu'app web » est activé, puis « Ajouter ».
+   - Utilise TOUJOURS l'appli depuis son icône : Safari et l'icône
+     ne partagent pas les mêmes données.
+
+5. UTILISATION
+   - Parties : entre ton pseudo Chess.com (et Lichess si tu en as un),
+     touche Synchroniser, puis Analyser.
+   - Progrès → Mon plan : tes lacunes et ton plan de la semaine.
+   - S'entraîner : exercices tirés de tes erreurs, répertoire d'ouvertures, cours.
+   - Jouer : parties contre Stockfish.
+
+Sauvegarde : Parties → « Sauvegarder ou transférer mes données ».
+Fais-en une de temps en temps et garde le fichier dans Fichiers ou iCloud.
+
+Mise à jour : quand Claude te donne une nouvelle version, refais l'étape 2
+avec les nouveaux fichiers (ils remplacent les anciens), puis ferme et rouvre l'appli.

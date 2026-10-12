@@ -1,0 +1,1973 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2949b8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Carnet">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Carnet d'échecs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Symbols+2&display=swap">
+<style>
+/* Layout: appli mobile — barre de navigation en bas, une colonne ; ≥ 900px : navigation en haut, échiquier | panneau. Tokens : encre de feuille de partie sur papier froid, échiquier en noyer. */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --surface-2:#f6f7f9; --line:#d9dde4; --fg:#151922; --muted:#5d6574;
+  --accent:#2949b8; --accent-soft:#e3e8f9; --on-accent:#ffffff;
+  --sq-light:#e8dcc4; --sq-dark:#a07c5a; --sq-hl:rgba(242,196,64,.55); --sq-sel:rgba(41,73,184,.45);
+  --win:#1f8a55; --draw:#7b8190; --loss:#c23b3b;
+  --c-best:#1f8a55; --c-impr:#c99410; --c-err:#e0731f; --c-gaffe:#d03535;
+  --eval-w:#f7f5f0; --eval-b:#2a2d33;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --f-piece:"Noto Sans Symbols 2","Segoe UI Symbol","DejaVu Sans",serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12151b; --surface:#1b1f27; --surface-2:#222732; --line:#2f3542; --fg:#e9ecf2; --muted:#9aa3b3;
+  --accent:#7d98ff; --accent-soft:#25304f; --on-accent:#0d1220;
+  --sq-light:#cdbb9c; --sq-dark:#86664a; --sq-hl:rgba(242,196,64,.5); --sq-sel:rgba(125,152,255,.5);
+  --win:#4cc187; --draw:#8b93a3; --loss:#ef6b6b;
+  --c-best:#4cc187; --c-impr:#e6b53a; --c-err:#f39248; --c-gaffe:#ef5d5d;
+  --eval-w:#e9e6df; --eval-b:#3a3f49; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151b; --surface:#1b1f27; --surface-2:#222732; --line:#2f3542; --fg:#e9ecf2; --muted:#9aa3b3;
+  --accent:#7d98ff; --accent-soft:#25304f; --on-accent:#0d1220;
+  --sq-light:#cdbb9c; --sq-dark:#86664a; --sq-hl:rgba(242,196,64,.5); --sq-sel:rgba(125,152,255,.5);
+  --win:#4cc187; --draw:#8b93a3; --loss:#ef6b6b;
+  --c-best:#4cc187; --c-impr:#e6b53a; --c-err:#f39248; --c-gaffe:#ef5d5d;
+  --eval-w:#e9e6df; --eval-b:#3a3f49; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:12px 96px}
+@media (min-width:900px){.wrap{padding-block:12px 48px}}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h2{font-size:1.35rem;font-weight:800}
+h3{font-size:1.02rem;font-weight:600}
+p{margin:0}
+a{color:var(--accent)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:6px 14px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{font-size:1.6rem;font-weight:800;letter-spacing:-.02em}
+.brand .glyph{font-family:var(--f-piece);font-size:1.6rem;color:var(--accent)}
+.who-chip{font-size:.85rem;color:var(--muted)}
+.who-chip b{color:var(--fg)}
+
+/* Navigation : barre basse sur mobile, onglets hauts sur grand écran */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 2px 8px;font-size:.7rem;font-weight:600;color:var(--muted);cursor:pointer;position:relative}
+.nav button .ic{font-family:var(--f-piece);font-size:1.35rem;line-height:1.1}
+.nav button[aria-selected="true"]{color:var(--accent)}
+.nav .badge{position:absolute;top:3px;left:calc(50% + 8px);font:600 .62rem/1 var(--f-mono);background:var(--c-gaffe);color:#fff;border-radius:8px;padding:2px 5px}
+@media (min-width:900px){
+  .nav{position:sticky;top:env(safe-area-inset-top,0px);bottom:auto;display:flex;gap:4px;border:0;border-bottom:1px solid var(--line);background:var(--bg);padding:0;margin-bottom:18px}
+  .nav button{flex-direction:row;gap:6px;font-size:.95rem;padding:10px 12px;border-bottom:2.5px solid transparent}
+  .nav button .ic{font-size:1.1rem}
+  .nav button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+  .nav .badge{position:static}
+}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px;max-width:100%;overflow-x:auto}
+.seg button{border:0;background:none;border-radius:9px;padding:7px 14px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;font-weight:600;cursor:pointer;min-height:40px;text-decoration:none;color:var(--fg)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sm{min-height:32px;padding:4px 10px;font-size:.88rem}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.note{font-size:.88rem;color:var(--muted);max-width:68ch}
+.toast{font-size:.9rem;font-weight:600}
+.warn{background:var(--accent-soft);border-radius:10px;padding:10px 12px;font-size:.9rem;max-width:72ch}
+.field{display:flex;flex-direction:column;gap:4px;flex:1 1 180px;min-width:0}
+.field label{font-size:.78rem;font-weight:600;color:var(--muted)}
+.field input,.field select,input.txt{border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:9px 12px;font-weight:600;min-width:0;width:100%}
+textarea.txt{width:100%;min-height:96px;resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:10px;font:12.5px/1.45 var(--f-mono)}
+details.fold summary{cursor:pointer;font-weight:600;color:var(--accent)}
+details.fold[open] summary{margin-bottom:10px}
+ol.note,ul.note{margin:0;padding-left:20px}
+
+.queue{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--accent);border-radius:14px;padding:12px 14px}
+.progress{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
+.progress div{height:100%;background:var(--accent);width:0;transition:width .2s}
+
+.games{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.game{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line);cursor:pointer}
+.game:first-child{border-top:0}
+.game:hover{background:var(--surface-2)}
+.res{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:700;font-family:var(--f-mono);color:#fff}
+.res.W{background:var(--win)}.res.L{background:var(--loss)}.res.D{background:var(--draw)}.res.X{background:var(--muted)}
+.game .who{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.game .meta{font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.game .side{text-align:right;font-size:.82rem}
+.chip{display:inline-block;font-size:.72rem;font-weight:600;border-radius:6px;padding:2px 7px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.chip.acc{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-family:var(--f-mono)}
+.chip.ex{background:transparent;border-style:dashed}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.more{display:block;width:100%;border:0;border-top:1px solid var(--line);background:var(--surface-2);padding:10px;font-weight:600;color:var(--accent);cursor:pointer}
+
+.board-area{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:stretch}
+.board-area.noeval{grid-template-columns:minmax(0,1fr)}
+.evalbar{border-radius:6px;overflow:hidden;background:var(--eval-b);position:relative;border:1px solid var(--line)}
+.evalbar .fill{position:absolute;left:0;right:0;bottom:0;background:var(--eval-w);transition:height .35s ease}
+.evalbar.flip .fill{bottom:auto;top:0}
+.evalbar .lbl{position:absolute;left:0;right:0;font:600 9px/1 var(--f-mono);text-align:center;padding:4px 0;z-index:1}
+.evalbar .lbl.top{top:0}.evalbar .lbl.bot{bottom:0}
+.board{position:relative;width:100%;aspect-ratio:1;container-type:inline-size;border-radius:6px;overflow:hidden;box-shadow:0 1px 0 var(--line),0 8px 24px -12px rgba(0,0,0,.35);user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.grid8{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;height:100%}
+.sq{position:relative;border:0;padding:0;margin:0;display:grid;place-items:center;cursor:pointer;background:var(--sq-light)}
+.sq.d{background:var(--sq-dark)}
+.sq.hl::before,.sq.sel::before{content:"";position:absolute;inset:0}
+.sq.hl::before{background:var(--sq-hl)}
+.sq.sel::before{background:var(--sq-sel)}
+.sq.tg::after{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(20,20,20,.28)}
+.sq.tg.cap::after{width:88%;height:88%;background:none;border:4px solid rgba(20,20,20,.28)}
+.sq .co{position:absolute;font:600 2.1cqw/1 var(--f-mono);opacity:.75}
+.sq .co.f{right:3%;bottom:3%}.sq .co.r{left:4%;top:4%}
+.sq.d .co{color:var(--sq-light)}.sq:not(.d) .co{color:var(--sq-dark)}
+.pc{position:relative;font-family:var(--f-piece);font-size:10cqw;line-height:1;z-index:1;pointer-events:none}
+.pc i,.pc b{font-style:normal;font-weight:400;display:block}
+.pc.b i{color:#1c1b1a}
+.pc.w i{color:#fbf8f1}
+.pc.w b{position:absolute;inset:0;color:#1c1b1a}
+.board svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+
+.an-grid{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.an-grid{grid-template-columns:minmax(0,500px) minmax(0,1fr)}}
+.players{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.pl{display:flex;align-items:center;gap:8px;min-width:0}
+.pl .dot{width:12px;height:12px;border-radius:3px;border:1px solid var(--muted);flex:none}
+.pl .dot.w{background:var(--eval-w)}.pl .dot.b{background:var(--eval-b)}
+.pl .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .acc{font-family:var(--f-mono);font-weight:600;font-size:1.05rem}
+.ctrl{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.ctrl .btn{padding:6px 0}
+.cur{border-left:4px solid var(--line);padding:10px 12px;background:var(--surface-2);border-radius:0 10px 10px 0;min-height:64px}
+.cur.gaffe{border-left-color:var(--c-gaffe)}.cur.err{border-left-color:var(--c-err)}.cur.impr{border-left-color:var(--c-impr)}.cur.best{border-left-color:var(--c-best)}
+.cur .mv{font-family:var(--f-mono);font-weight:600;font-size:1.05rem}
+.tag{font-weight:700;font-size:.85rem}
+.tag.gaffe{color:var(--c-gaffe)}.tag.err{color:var(--c-err)}.tag.impr{color:var(--c-impr)}.tag.best{color:var(--c-best)}
+.explain{margin-top:8px;font-size:.92rem;max-width:65ch;white-space:pre-wrap}
+.counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;text-align:center}
+.counts div{background:var(--surface-2);border-radius:10px;padding:8px 4px}
+.counts b{display:block;font-family:var(--f-mono);font-size:1.05rem}
+.counts span{font-size:.72rem;color:var(--muted)}
+.counts .cw{display:block;font-size:.72rem;font-family:var(--f-mono)}
+.graph{width:100%;height:auto;display:block;cursor:crosshair;border-radius:8px;background:var(--eval-b)}
+.moves{display:grid;grid-template-columns:2.6em minmax(0,1fr) minmax(0,1fr);font-family:var(--f-mono);font-size:.92rem;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.moves .n{color:var(--muted);padding:5px 6px;background:var(--surface-2);text-align:right}
+.moves button{border:0;background:none;text-align:left;padding:5px 8px;cursor:pointer;display:flex;gap:6px;align-items:center;min-width:0}
+.moves button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.moves .g{font-weight:700}
+.g.gaffe{color:var(--c-gaffe)}.g.err{color:var(--c-err)}.g.impr{color:var(--c-impr)}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi b{display:block;font-family:var(--f-display);font-size:1.6rem;font-weight:800;font-variant-numeric:tabular-nums}
+.kpi span{font-size:.8rem;color:var(--muted)}
+.two{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.chart{width:100%;height:auto;display:block}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num,th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;min-width:60px}
+.bar div{height:100%}
+.empty{text-align:center;padding:28px 16px;color:var(--muted);border:1px dashed var(--line);border-radius:14px;background:var(--surface)}
+.empty .big{font-family:var(--f-piece);font-size:2.4rem;color:var(--fg);opacity:.6}
+
+.gap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.gap.p1{border-color:var(--c-gaffe)}
+.gap .hd{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.sev{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-radius:6px;padding:3px 8px;white-space:nowrap}
+.sev.p1{background:var(--c-gaffe);color:#fff}.sev.p2{background:var(--c-impr);color:#1b1608}.sev.p3{background:var(--surface-2);color:var(--win);border:1px solid var(--line)}.sev.p0{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.meter{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;font-size:.85rem}
+.meter .track{height:8px;border-radius:4px;background:var(--surface-2);position:relative}
+.meter .track i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.meter .track s{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--fg);opacity:.55}
+.gap ul{margin:0;padding-left:18px;max-width:68ch}
+.gap li{margin-bottom:3px}
+.lesson-body{max-width:68ch;display:flex;flex-direction:column;gap:8px;font-size:.94rem}
+.lesson-body h4{margin:6px 0 0;font-size:.9rem;font-family:var(--f-display)}
+.lesson-body ol,.lesson-body ul{margin:0;padding-left:20px}
+.links{display:flex;gap:8px;flex-wrap:wrap}
+.week{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.day{background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:.88rem}
+.day b{display:block;font-family:var(--f-display);font-size:.95rem;margin-bottom:2px}
+.coach{white-space:pre-wrap;max-width:70ch;font-size:.94rem}
+
+.tr-grid{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.tr-grid{grid-template-columns:minmax(0,460px) minmax(0,1fr)}}
+.fb{font-weight:600;padding:10px 12px;border-radius:10px;background:var(--surface-2)}
+.fb.ok{color:var(--win)}.fb.no{color:var(--loss)}
+
+/* Répertoire et cours */
+.cards{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.card .side-tag{font-family:var(--f-piece);font-size:1.3rem;line-height:1}
+.card .stats{display:flex;gap:12px;font-size:.82rem;color:var(--muted)}
+.card .stats b{color:var(--fg);font-family:var(--f-mono)}
+.due{color:var(--c-err);font-weight:700}
+.lines{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto;background:var(--surface)}
+.lines div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);font:13px/1.45 var(--f-mono)}
+.lines div:first-child{border-top:0}
+.lines button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:2px 6px}
+.cur-line{font:13.5px/1.6 var(--f-mono);min-height:1.6em;background:var(--surface-2);border-radius:10px;padding:8px 10px;word-break:break-word}
+.known{display:flex;gap:6px;flex-wrap:wrap}
+.known button{border:1px solid var(--line);background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:3px 9px;font:600 .85rem var(--f-mono);cursor:pointer}
+.course{display:flex;flex-direction:column;gap:8px}
+.lessons{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.lessons button{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;border:0;border-top:1px solid var(--line);background:none;padding:11px 14px;text-align:left;cursor:pointer}
+.lessons button:first-child{border-top:0}
+.lessons button:hover{background:var(--surface-2)}
+.lessons .num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 .8rem var(--f-mono);background:var(--surface-2);border:1px solid var(--line)}
+.lessons .num.done{background:var(--win);color:#fff;border-color:var(--win)}
+.pbar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.pbar div{height:100%;background:var(--win)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="glyph" aria-hidden="true">♞</span><h1>Carnet d'échecs</h1></div>
+    <div class="who-chip" id="whoChip"></div>
+  </header>
+
+  <nav class="nav" role="tablist" aria-label="Sections">
+    <button role="tab" aria-selected="true" data-tab="games"><span class="ic" aria-hidden="true">♜</span>Parties</button>
+    <button role="tab" aria-selected="false" data-tab="analyse"><span class="ic" aria-hidden="true">♝</span>Analyse</button>
+    <button role="tab" aria-selected="false" data-tab="progress"><span class="ic" aria-hidden="true">♛</span>Progrès</button>
+    <button role="tab" aria-selected="false" data-tab="train"><span class="ic" aria-hidden="true">♞</span>S'entraîner<span class="badge" id="nTrain" hidden></span></button>
+    <button role="tab" aria-selected="false" data-tab="play"><span class="ic" aria-hidden="true">♚</span>Jouer</button>
+  </nav>
+
+  <!-- PARTIES -->
+  <section id="sec-games" class="stack">
+    <div class="panel stack">
+      <div>
+        <h2>Mes comptes</h2>
+        <p class="note" style="margin-top:4px">Entre tes pseudos : le carnet récupère toutes tes parties publiques. Touche Synchroniser à nouveau plus tard pour ajouter les nouvelles.</p>
+      </div>
+      <form class="row" id="syncForm" style="align-items:flex-end">
+        <div class="field"><label for="ccUser">Pseudo Chess.com</label><input id="ccUser" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ton pseudo"></div>
+        <div class="field"><label for="liUser">Pseudo Lichess (facultatif)</label><input id="liUser" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ton pseudo"></div>
+        <button class="btn primary" id="btnSync" type="submit">Synchroniser</button>
+      </form>
+      <div class="progress" id="syncProg" hidden><div></div></div>
+      <div class="toast" id="syncMsg" role="status"></div>
+      <div class="warn" id="syncBlocked" hidden>
+        Dans l'appli Claude, cette page n'a pas le droit de contacter Chess.com ou Lichess. Utilise la version installable du carnet (mise en ligne sur ton propre site), ou importe tes parties en PGN juste en dessous.
+      </div>
+      <details class="fold">
+        <summary>Importer des parties en PGN</summary>
+        <div class="stack">
+          <textarea class="txt" id="pgnInput" spellcheck="false" placeholder='[Event "Live Chess"]&#10;[White "..."]&#10;...&#10;1. e4 e5 2. Nf3 ...'></textarea>
+          <div class="row">
+            <button class="btn" id="btnImport" type="button">Importer le texte</button>
+            <label class="btn" for="fileInput">Choisir un fichier .pgn</label>
+            <input type="file" id="fileInput" accept=".pgn,text/plain" hidden multiple>
+            <span class="toast" id="importMsg" role="status"></span>
+          </div>
+          <ol class="note">
+            <li><b>Toutes tes parties</b> : sur chess.com (ordinateur), profil → Parties → Voir tout → tout sélectionner → icône de téléchargement.</li>
+            <li><b>Une partie</b> : dans l'appli Chess.com, ouvre la partie → Partager → PGN → Copier, puis colle ici.</li>
+          </ol>
+        </div>
+      </details>
+      <details class="fold" id="backupFold" hidden>
+        <summary>Sauvegarder ou transférer mes données</summary>
+        <div class="stack">
+          <p class="note">Tes données restent sur cet appareil. Pour les retrouver sur un autre téléphone ou ordinateur, exporte-les ici puis importe le fichier là-bas.</p>
+          <div class="row">
+            <button class="btn" id="btnExport" type="button">Exporter mes données</button>
+            <label class="btn" for="backupInput">Importer une sauvegarde</label>
+            <input type="file" id="backupInput" accept=".json,application/json" hidden>
+            <span class="toast" id="backupMsg" role="status"></span>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="queue" id="queueBox" hidden>
+      <div class="stack" style="gap:6px;min-width:0">
+        <div class="toast" id="queueMsg"></div>
+        <div class="progress"><div id="queueBar"></div></div>
+      </div>
+      <button class="btn sm" id="queueStop" type="button">Arrêter</button>
+    </div>
+    <div class="panel row between" id="queueOffer" hidden>
+      <div><h3 id="queueOfferTitle"></h3><div class="note">L'analyse tourne sur ton appareil, environ 30 à 60 secondes par partie. Garde la page ouverte.</div></div>
+      <div class="row">
+        <select id="queueN" class="btn sm" aria-label="Nombre de parties">
+          <option value="10">10 parties</option>
+          <option value="25" selected>25 parties</option>
+          <option value="50">50 parties</option>
+          <option value="9999">Toutes</option>
+        </select>
+        <button class="btn primary" id="queueStart" type="button">Analyser</button>
+      </div>
+    </div>
+
+    <div class="row between">
+      <h2>Mes parties</h2>
+      <div class="filters" id="tcFilters"></div>
+    </div>
+    <div id="gameList"></div>
+  </section>
+
+  <!-- ANALYSE -->
+  <section id="sec-analyse" hidden>
+    <div class="an-grid">
+      <div class="stack">
+        <div class="players" id="plTop"></div>
+        <div class="board-area" id="anArea">
+          <div class="evalbar" id="evalbar"><div class="fill" id="evalfill" style="height:50%"></div><span class="lbl top" id="evalTop"></span><span class="lbl bot" id="evalBot"></span></div>
+          <div class="board" id="anBoard"></div>
+        </div>
+        <div class="players" id="plBot"></div>
+        <div class="ctrl">
+          <button class="btn" id="bFirst" aria-label="Début">⏮</button>
+          <button class="btn" id="bPrev" aria-label="Coup précédent">◀</button>
+          <button class="btn" id="bFlip" aria-label="Retourner l'échiquier">⇅</button>
+          <button class="btn" id="bNext" aria-label="Coup suivant">▶</button>
+          <button class="btn" id="bLast" aria-label="Fin">⏭</button>
+        </div>
+        <button class="btn sm ghost" id="bPlayHere">Jouer cette position contre Stockfish</button>
+      </div>
+      <div class="stack" style="min-width:0">
+        <div>
+          <div class="eyebrow" id="anMeta"></div>
+          <h2 id="anTitle" style="margin-top:2px"></h2>
+        </div>
+        <div class="panel stack" id="anRun">
+          <div class="row between">
+            <div><h3>Analyse par moteur</h3><div class="note">Stockfish tourne sur ton appareil. Compte 1 à 3 minutes par partie.</div></div>
+            <div class="row">
+              <select id="depth" class="btn sm" aria-label="Profondeur">
+                <option value="10">Rapide</option>
+                <option value="12" selected>Normale</option>
+                <option value="15">Approfondie</option>
+              </select>
+              <button class="btn primary" id="btnAnalyse">Analyser la partie</button>
+            </div>
+          </div>
+          <div class="progress" id="anProg" hidden><div></div></div>
+          <div class="note" id="anStatus" role="status"></div>
+        </div>
+        <div id="anCounts"></div>
+        <div class="cur" id="curMove"></div>
+        <svg class="graph" id="graph" viewBox="0 0 600 110" preserveAspectRatio="none" role="img" aria-label="Courbe d'évaluation"></svg>
+        <div class="moves" id="moveList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRÈS -->
+  <section id="sec-progress" class="stack" hidden>
+    <div class="seg" data-sub="progress"><button aria-pressed="true" data-v="stats">Statistiques</button><button aria-pressed="false" data-v="plan">Mon plan</button></div>
+    <div id="progStats" class="stack"></div>
+    <div id="progPlan" class="stack" hidden></div>
+  </section>
+
+  <!-- S'ENTRAÎNER -->
+  <section id="sec-train" class="stack" hidden>
+    <div class="seg" data-sub="train"><button aria-pressed="true" data-v="puz">Exercices</button><button aria-pressed="false" data-v="rep">Répertoire</button><button aria-pressed="false" data-v="course">Cours</button></div>
+    <div id="trPuz"></div>
+    <div id="trRep" hidden></div>
+    <div id="trCourse" hidden></div>
+  </section>
+
+  <!-- JOUER -->
+  <section id="sec-play" hidden></section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ls = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
+const IN_CLAUDE = !!(window.claude && window.claude.use);
+const DAY = 86400000;
+
+const EXAMPLE_PGN = `[Event "Partie de l'Opéra (exemple)"]
+[Site "Paris"]
+[Date "1858.11.02"]
+[White "Paul Morphy"]
+[Black "Duc de Brunswick & Comte Isouard"]
+[Result "1-0"]
+[ECO "C41"]
+[Opening "Philidor Defense"]
+
+1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8# 1-0`;
+
+/* ================= Utilitaires échecs ================= */
+const FR = {K:"R",Q:"D",R:"T",B:"F",N:"C"};
+const frSan = san => san ? san.replace(/[KQRBN]/g, m => FR[m]) : "";
+const winP = cp => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * Math.max(-2000, Math.min(2000, cp)))) - 1);
+const MATE = 2000;
+const fenKey = f => f.split(" ").slice(0, 4).join(" ");
+const turnOf = f => f.split(" ")[1];
+
+function hash(str){ let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++){ const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return "g" + (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+function headers(pgn){ const h = {}; pgn.replace(/\[(\w+)\s+"([^"]*)"\]/g, (_, k, v) => { h[k] = v; }); return h; }
+function splitPgn(text){
+  text = text.replace(/\r/g, "").trim();
+  if (!text) return [];
+  return text.split(/\n\s*\n(?=\[Event )/).map(p => p.trim()).filter(p => /\d\.\s*\S/.test(p));
+}
+function timeClass(tc){
+  if (!tc || tc === "-") return "Autre";
+  if (tc.includes("/")) return "Quotidien";
+  const [b, i] = tc.split("+").map(Number);
+  const t = (b || 0) + 40 * (i || 0);
+  if (t < 180) return "Bullet"; if (t < 600) return "Blitz"; if (t < 3600) return "Rapide"; return "Classique";
+}
+function openingName(h){
+  let name = "";
+  if (h.ECOUrl){ const seg = (h.ECOUrl.split("/openings/")[1] || "").split(/[?#]/)[0];
+    const toks = []; for (const t of seg.split("-")){ if (/^\d/.test(t)) break; toks.push(t); } name = toks.join(" "); }
+  if (!name && h.Opening && h.Opening !== "?") name = h.Opening;
+  if (!name) name = h.ECO ? "ECO " + h.ECO : "Ouverture inconnue";
+  return name;
+}
+function openingFamily(name){
+  const stop = ["Game","Defense","Opening","Gambit","Attack","System","Variation"], out = [];
+  for (const t of name.split(" ")){ out.push(t); if (stop.includes(t.replace(/:$/, ""))) break; if (out.length >= 3) break; }
+  return out.join(" ").replace(/:$/, "");
+}
+function parseDate(h){ const d = (h.UTCDate || h.Date || "").replace(/\./g, "-"); return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ""; }
+function fmtDate(d){ if (!d) return ""; const [y, m, dd] = d.split("-"); return `${dd}/${m}/${y}`; }
+function parseClocks(pgn){
+  const body = pgn.replace(/\[[^\]]*"\]\s*/g, "");
+  const out = []; const re = /%clk\s+(\d+):(\d+):(\d+(?:\.\d+)?)/g; let m;
+  while ((m = re.exec(body))) out.push(+m[1] * 3600 + +m[2] * 60 + +m[3]);
+  return out;
+}
+function makeGame(pgn, opt){
+  opt = opt || {};
+  const h = headers(pgn);
+  if (h.Variant && !/standard|from position/i.test(h.Variant)) return null;
+  const c = new Chess();
+  if (!c.load_pgn(pgn, {sloppy:true})) return null;
+  const hist = c.history();
+  if (!hist.length) return null;
+  const link = h.Link || (/^https?:/.test(h.Site || "") ? h.Site : "");
+  const key = link || [h.Site, h.Date, h.UTCTime || h.StartTime, h.White, h.Black, hist.slice(0, 12).join(" ")].join("|");
+  const clk = parseClocks(pgn);
+  const base = h.TimeControl && !h.TimeControl.includes("/") ? parseInt(h.TimeControl, 10) || 0 : 0;
+  return {
+    id: hash(key), pgn, example: !!opt.example, src: opt.src || (/lichess/i.test(h.Site || "") ? "lichess" : /chess\.com/i.test(h.Site || "") ? "chesscom" : "pgn"),
+    white: h.White || "Blancs", black: h.Black || "Noirs",
+    welo: +h.WhiteElo || null, belo: +h.BlackElo || null,
+    result: h.Result || "*", date: parseDate(h), time: h.UTCTime || h.StartTime || "",
+    tc: opt.tc || timeClass(h.TimeControl), base, clk: clk.length === hist.length ? clk : null,
+    opening: openingName(h), link, plies: hist.length, termination: h.Termination || "",
+    analysis: null, importedAt: Date.now()
+  };
+}
+const replayCache = new Map();
+function replay(g){
+  if (replayCache.has(g.id)) return replayCache.get(g.id);
+  const c = new Chess(); c.load_pgn(g.pgn, {sloppy:true});
+  const mv = c.history({verbose:true});
+  const start = headers(g.pgn).FEN;
+  const r = start ? new Chess(start) : new Chess();
+  const fens = [r.fen()], moves = [];
+  for (const m of mv){ r.move(m); fens.push(r.fen()); moves.push({san:m.san, from:m.from, to:m.to, uci:m.from + m.to + (m.promotion || ""), color:m.color}); }
+  const out = {fens, moves}; replayCache.set(g.id, out); return out;
+}
+function phaseOf(fen){
+  const v = {q:9,r:5,b:3,n:3}; let mat = 0;
+  for (const ch of fen.split(" ")[0]){ const l = ch.toLowerCase(); if (v[l]) mat += v[l]; }
+  return mat <= 26 ? "f" : "m";
+}
+function uciToSan(fen, uci){
+  if (!uci) return ""; const c = new Chess(fen);
+  const m = c.move({from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || "q"});
+  return m ? m.san : uci;
+}
+function pvToSan(fen, pv){
+  const c = new Chess(fen), out = [];
+  for (const u of (pv || "").split(" ").filter(Boolean)){ const m = c.move({from:u.slice(0, 2), to:u.slice(2, 4), promotion:u[4] || "q"}); if (!m) break; out.push(m.san); }
+  return out;
+}
+function lineText(sans, startPly){
+  let s = "", ply = startPly || 0;
+  sans.forEach((m, i) => { const p = ply + i; if (p % 2 === 0) s += (p / 2 + 1) + ". "; else if (i === 0) s += Math.ceil(p / 2) + "… "; s += frSan(m) + " "; });
+  return s.trim();
+}
+function evalText(cp, mate){
+  if (mate === 0) return "#";
+  if (mate != null) return (mate > 0 ? "+" : "−") + "M" + Math.abs(mate);
+  const v = cp / 100; return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
+}
+
+/* ================= État ================= */
+const state = {
+  games: [], tab: "games", sub: {progress: "stats", train: "puz"}, filter: "Tout", shown: 30,
+  cur: null, ply: 0, flip: false,
+  cc: ls.get("ce.cc", ls.get("ce.user", "")), li: ls.get("ce.li", ""),
+  solved: ls.get("ce.solved", {}), sample: null,
+  reps: [], srs: {}, srsMeta: {day: "", n: 0}, course: {}
+};
+function names(){ return [state.cc, state.li, autoUser()].filter(Boolean).map(s => s.toLowerCase()); }
+function myColor(g){
+  if (g.mine) return g.mine;
+  const n = names(); if (!n.length) return null;
+  if (n.includes(g.white.toLowerCase())) return "w";
+  if (n.includes(g.black.toLowerCase())) return "b";
+  return null;
+}
+let _auto = null;
+function autoUser(){
+  if (_auto !== null) return _auto;
+  const cnt = {}, real = realGames();
+  for (const g of real){ cnt[g.white] = (cnt[g.white] || 0) + 1; cnt[g.black] = (cnt[g.black] || 0) + 1; }
+  const best = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+  _auto = best && real.length >= 2 && best[1] === real.length ? best[0] : "";
+  return _auto;
+}
+function outcome(g, col){
+  if (g.result === "1/2-1/2") return "D";
+  if (!col || g.result === "*") return "X";
+  return (g.result === "1-0") === (col === "w") ? "W" : "L";
+}
+const realGames = () => state.games.filter(g => !g.example);
+function sortGames(){ state.games.sort((a, b) => (a.example - b.example) || ((b.date + b.time).localeCompare(a.date + a.time)) || (b.importedAt - a.importedAt)); }
+function addGames(list){
+  let added = 0; const ids = new Set(state.games.map(g => g.id));
+  for (const g of list){ if (!g || ids.has(g.id)) continue; ids.add(g.id); state.games.push(g); added++; }
+  _auto = null; sortGames(); return added;
+}
+
+/* ================= Stockage ================= */
+const Store = {
+  mode: "mem", db: null, idb: null,
+  async init(){
+    if (IN_CLAUDE){ try{ const db = await window.claude.use("db"); if (db){ this.db = db; this.mode = "db"; return; } }catch(e){} }
+    try{
+      this.idb = await new Promise((res, rej) => {
+        const r = indexedDB.open("carnet-echecs", 2);
+        r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains("games")) d.createObjectStore("games", {keyPath: "id"}); if (!d.objectStoreNames.contains("kv")) d.createObjectStore("kv"); };
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      });
+      this.mode = "idb";
+    }catch(e){ this.mode = "mem"; }
+  },
+  async all(){
+    if (this.mode === "db"){ const s = await this.db.collection("games").get(); return s.docs.map(d => d.data()).filter(x => x && x.pgn && x.id); }
+    if (this.mode === "idb") return new Promise(res => { const r = this.idb.transaction("games").objectStore("games").getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
+    return [];
+  },
+  async putMany(list){
+    list = list.filter(g => !g.example && !g.temp);
+    if (!list.length) return;
+    if (this.mode === "db"){ for (const g of list){ try{ await this.db.collection("games").doc(g.id).set(g); }catch(e){ console.warn(e); } } return; }
+    if (this.mode === "idb") return new Promise(res => { const tx = this.idb.transaction("games", "readwrite"); const st = tx.objectStore("games"); for (const g of list) st.put(g); tx.oncomplete = () => res(); tx.onerror = () => res(); });
+  },
+  async saveAnalysis(g){
+    if (g.temp) return;
+    if (g.example){ ls.set("ce.example", g.analysis); return; }
+    if (this.mode === "db"){ try{ await this.db.collection("games").doc(g.id).update({analysis: g.analysis}); }catch(e){ console.warn(e); } return; }
+    return this.putMany([g]);
+  },
+  async kvGet(k, d){
+    try{
+      if (this.mode === "db"){ const s = await this.db.collection("kv").doc(k).get(); return s.exists ? s.data().v : d; }
+      if (this.mode === "idb") return await new Promise(res => { const r = this.idb.transaction("kv").objectStore("kv").get(k); r.onsuccess = () => res(r.result === undefined ? d : r.result); r.onerror = () => res(d); });
+    }catch(e){}
+    return ls.get("ce.kv." + k, d);
+  },
+  _t: {},
+  kvSet(k, v){
+    clearTimeout(this._t[k]);
+    this._t[k] = setTimeout(async () => {
+      try{
+        if (this.mode === "db"){ await this.db.collection("kv").doc(k).set({v}); return; }
+        if (this.mode === "idb"){ this.idb.transaction("kv", "readwrite").objectStore("kv").put(v, k); return; }
+      }catch(e){ console.warn(e); }
+      ls.set("ce.kv." + k, v);
+    }, 400);
+  }
+};
+
+/* ================= Moteur Stockfish ================= */
+function makeEngine(){
+  return {
+    w: null, ready: null, cb: null, ok: false,
+    init(){
+      if (this.ready) return this.ready;
+      this.ready = new Promise((res, rej) => {
+        let w;
+        try{
+          const blob = new Blob(["importScripts('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');"], {type:"application/javascript"});
+          w = new Worker(URL.createObjectURL(blob));
+        }catch(e){ rej(e); return; }
+        this.w = w;
+        const t = setTimeout(() => rej(new Error("délai dépassé")), 25000);
+        w.onmessage = e => {
+          const line = typeof e.data === "string" ? e.data : "";
+          if (!this.ok){
+            if (line === "uciok") w.postMessage("isready");
+            else if (line === "readyok"){ this.ok = true; clearTimeout(t); res(); }
+            return;
+          }
+          if (this.cb) this.cb(line);
+        };
+        w.onerror = e => { clearTimeout(t); rej(e); };
+        w.postMessage("uci");
+      });
+      this.ready.catch(() => { this.ready = null; });
+      return this.ready;
+    },
+    analyse(fen, depth){
+      return new Promise(res => {
+        const turn = turnOf(fen) === "w" ? 1 : -1;
+        let last = {cp:0, mate:null, pv:""};
+        this.cb = line => {
+          if (line.startsWith("info") && line.includes(" pv ") && !/(upper|lower)bound/.test(line)){
+            const m = line.match(/score (cp|mate) (-?\d+)/);
+            if (m){ const v = +m[2], pv = line.split(" pv ")[1].trim();
+              last = m[1] === "cp" ? {cp: v * turn, mate: null, pv} : {cp: (v > 0 ? MATE : -MATE) * turn, mate: v * turn, pv}; }
+          } else if (line.startsWith("bestmove")){
+            this.cb = null; const best = line.split(" ")[1];
+            res({...last, best: best && best !== "(none)" ? best : null});
+          }
+        };
+        this.w.postMessage("position fen " + fen);
+        this.w.postMessage("go depth " + depth);
+      });
+    },
+    bestMove(fen, skill, depth, movetime){
+      return new Promise(res => {
+        this.cb = line => { if (line.startsWith("bestmove")){ this.cb = null; const b = line.split(" ")[1]; res(b && b !== "(none)" ? b : null); } };
+        this.w.postMessage("setoption name Skill Level value " + skill);
+        this.w.postMessage("position fen " + fen);
+        this.w.postMessage(`go depth ${depth} movetime ${movetime}`);
+      });
+    }
+  };
+}
+const Engine = makeEngine(), PlayEngine = makeEngine();
+let engineBusy = false;
+async function analyseGame(g, depth, onProg){
+  await Engine.init();
+  Engine.w.postMessage("ucinewgame");
+  const {fens, moves} = replay(g);
+  const ev = [], mt = [], best = [], pv = [];
+  for (let i = 0; i < fens.length; i++){
+    const c = new Chess(fens[i]);
+    if (c.in_checkmate()){ ev.push(c.turn() === "w" ? -MATE : MATE); mt.push(0); best.push(null); pv.push(""); }
+    else if (c.in_stalemate() || c.insufficient_material()){ ev.push(0); mt.push(null); best.push(null); pv.push(""); }
+    else { const r = await Engine.analyse(fens[i], depth); ev.push(r.cp); mt.push(r.mate); best.push(r.best); pv.push(r.pv.split(" ").slice(0, 6).join(" ")); }
+    onProg((i + 1) / fens.length);
+  }
+  const cls = [], accs = {w:[], b:[]}, ph = [];
+  for (let k = 1; k < fens.length; k++){
+    const mover = moves[k - 1].color, s = mover === "w" ? 1 : -1;
+    const wb = winP(s * ev[k - 1]), wa = winP(s * ev[k]), drop = Math.max(0, wb - wa);
+    let c = "ok";
+    if (best[k - 1] && moves[k - 1].uci.slice(0, 4) === best[k - 1].slice(0, 4)) c = "best";
+    else if (drop >= 15) c = "gaffe"; else if (drop >= 10) c = "err"; else if (drop >= 5) c = "impr";
+    if ((c === "gaffe" || c === "err") && wa >= 85) c = "impr";
+    cls.push(c);
+    accs[mover].push(Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * drop) - 3.1669)));
+    ph.push(k <= 20 ? "o" : phaseOf(fens[k - 1]));
+  }
+  const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
+  return {depth, ev, mt, best, pv, cls, ph: ph.join(""), acc: {w: avg(accs.w), b: avg(accs.b)}, at: Date.now()};
+}
+
+/* ================= Échiquier ================= */
+const GL = {k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"}, GO = {k:"♔",q:"♕",r:"♖",b:"♗",n:"♘",p:"♙"};
+function drawBoard(el, fen, o){
+  o = o || {};
+  const c = new Chess(fen), B = c.board();
+  let h = "";
+  for (let ri = 0; ri < 8; ri++) for (let fi = 0; fi < 8; fi++){
+    const r = o.flip ? 7 - ri : ri, f = o.flip ? 7 - fi : fi;
+    const sq = "abcdefgh"[f] + (8 - r), p = B[r][f];
+    const cl = ["sq"]; if ((r + f) % 2) cl.push("d");
+    if (o.last && (o.last.from === sq || o.last.to === sq)) cl.push("hl");
+    if (o.sel === sq) cl.push("sel");
+    if (o.targets && o.targets.includes(sq)){ cl.push("tg"); if (p) cl.push("cap"); }
+    let inner = "";
+    if (ri === 7) inner += `<span class="co f">${"abcdefgh"[f]}</span>`;
+    if (fi === 0) inner += `<span class="co r">${8 - r}</span>`;
+    if (p) inner += p.color === "w" ? `<span class="pc w"><i>${GL[p.type]}</i><b>${GO[p.type]}</b></span>` : `<span class="pc b"><i>${GL[p.type]}</i></span>`;
+    h += `<button class="${cl.join(" ")}" data-sq="${sq}" aria-label="${sq}${p ? " " + p.color + p.type : ""}">${inner}</button>`;
+  }
+  let arrows = "";
+  for (const a of (o.arrows || [])){
+    if (!a || !a.uci || a.uci.length < 4) continue;
+    const pos = s => { let f = s.charCodeAt(0) - 97, r = 8 - +s[1]; if (o.flip){ f = 7 - f; r = 7 - r; } return [f + .5, r + .5]; };
+    const [x1, y1] = pos(a.uci.slice(0, 2)), [x2, y2] = pos(a.uci.slice(2, 4));
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    const ex = x2 - ux * .32, ey = y2 - uy * .32, hw = .26, hx = x2 - ux * .02, hy = y2 - uy * .02;
+    arrows += `<line x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}" stroke="${a.color}" stroke-width=".17" stroke-linecap="round" opacity=".85"/>`
+      + `<polygon points="${hx},${hy} ${ex - uy * hw},${ey + ux * hw} ${ex + uy * hw},${ey - ux * hw}" fill="${a.color}" opacity=".85"/>`;
+  }
+  el.innerHTML = `<div class="grid8">${h}</div><svg class="arrows" viewBox="0 0 8 8" aria-hidden="true">${arrows}</svg>`;
+}
+/* Saisie de coups par toucher : renvoie un gestionnaire réutilisable */
+function tapper(getFen, canMove, onMove, redraw){
+  let sel = null;
+  return {
+    get sel(){ return sel; }, clear(){ sel = null; },
+    targets(){ if (!sel) return []; return new Chess(getFen()).moves({square: sel, verbose: true}).map(m => m.to); },
+    tap(sq){
+      const c = new Chess(getFen()), p = c.get(sq);
+      if (sel && canMove()){
+        const mv = c.moves({square: sel, verbose: true}).find(m => m.to === sq);
+        if (mv){ sel = null; onMove({from: mv.from, to: mv.to, promotion: mv.promotion ? "q" : undefined, san: mv.san}); return; }
+      }
+      sel = p && p.color === c.turn() && canMove() ? sq : null;
+      redraw();
+    }
+  };
+}
+
+/* ================= Navigation ================= */
+const TABS = ["games", "analyse", "progress", "train", "play"];
+function setTab(t, sub){
+  if (!TABS.includes(t)) t = "games";
+  state.tab = t;
+  if (sub) state.sub[t] = sub;
+  for (const b of document.querySelectorAll(".nav button")) b.setAttribute("aria-selected", b.dataset.tab === t);
+  for (const s of TABS) $("#sec-" + s).hidden = s !== t;
+  renderTab(); ls.set("ce.tab", t);
+  window.scrollTo(0, 0);
+}
+function renderTab(){
+  const t = state.tab;
+  if (t === "games") renderGames();
+  if (t === "analyse") renderAnalyse();
+  if (t === "progress"){ syncSeg("progress"); state.sub.progress === "plan" ? renderPlan() : renderStats(); }
+  if (t === "train"){ syncSeg("train"); const s = state.sub.train; s === "rep" ? renderRep() : s === "course" ? renderCourse() : renderPuz(); }
+  if (t === "play") renderPlay();
+}
+function syncSeg(t){
+  const seg = document.querySelector(`.seg[data-sub="${t}"]`);
+  for (const b of seg.querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.v === state.sub[t]);
+  if (t === "progress"){ $("#progStats").hidden = state.sub.progress !== "stats"; $("#progPlan").hidden = state.sub.progress !== "plan"; }
+  if (t === "train"){ $("#trPuz").hidden = state.sub.train !== "puz"; $("#trRep").hidden = state.sub.train !== "rep"; $("#trCourse").hidden = state.sub.train !== "course"; }
+}
+document.querySelector(".nav").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) setTab(b.dataset.tab); });
+document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (!b) return; state.sub[seg.dataset.sub] = b.dataset.v; ls.set("ce.sub", state.sub); renderTab(); }));
+
+/* ================= Synchronisation Chess.com / Lichess ================= */
+async function fetchRetry(url, init){
+  for (let a = 0; a < 3; a++){
+    const r = await fetch(url, init);
+    if (r.status === 429){ await new Promise(s => setTimeout(s, 2000 * (a + 1))); continue; }
+    return r;
+  }
+  throw new Error("Trop de requêtes");
+}
+async function ingest(text){
+  const games = splitPgn(text).map(p => makeGame(p)).filter(Boolean);
+  const fresh = games.filter(g => !state.games.some(x => x.id === g.id));
+  const n = addGames(fresh);
+  await Store.putMany(fresh);
+  return n;
+}
+async function syncChessCom(user, msg, setP){
+  const sync = ls.get("ce.sync", {});
+  const cc = sync.cc && sync.cc.user === user.toLowerCase() ? sync.cc : {user: user.toLowerCase(), done: {}};
+  const r = await fetchRetry(`https://api.chess.com/pub/player/${encodeURIComponent(user.toLowerCase())}/games/archives`);
+  if (r.status === 404) throw {user: true, msg: `Le pseudo Chess.com « ${user} » n'existe pas.`};
+  if (!r.ok) throw {user: true, msg: "Chess.com ne répond pas pour le moment. Réessaie dans quelques minutes."};
+  const archives = ((await r.json()).archives || []);
+  const todo = archives.filter((u, i) => i === archives.length - 1 || !cc.done[u]).reverse();
+  let total = 0;
+  for (let i = 0; i < todo.length; i++){
+    const [y, m] = todo[i].split("/").slice(-2);
+    msg(`Chess.com : ${m}/${y} (${i + 1}/${todo.length})… ${plural(total, "nouvelle partie")}`);
+    try{
+      const rr = await fetchRetry(todo[i] + "/pgn");
+      if (rr.ok){ total += await ingest(await rr.text()); if (todo[i] !== archives[archives.length - 1]) cc.done[todo[i]] = 1; }
+    }catch(e){ console.warn(e); }
+    setP((i + 1) / todo.length);
+    if (i % 3 === 2) { renderGames(); updateBadges(); }
+  }
+  sync.cc = cc; ls.set("ce.sync", sync);
+  return total;
+}
+async function syncLichess(user, msg, setP){
+  const sync = ls.get("ce.sync", {});
+  const li = sync.li && sync.li.user === user.toLowerCase() ? sync.li : {user: user.toLowerCase(), last: 0};
+  const url = `https://lichess.org/api/games/user/${encodeURIComponent(user)}?clocks=true&opening=true&perfType=ultraBullet,bullet,blitz,rapid,classical,correspondence${li.last ? "&since=" + (li.last + 1) : ""}`;
+  msg("Lichess : téléchargement de tes parties…"); setP(.05);
+  const r = await fetchRetry(url, {headers: {Accept: "application/x-chess-pgn"}});
+  if (r.status === 404) throw {user: true, msg: `Le pseudo Lichess « ${user} » n'existe pas.`};
+  if (!r.ok) throw {user: true, msg: "Lichess ne répond pas pour le moment. Réessaie dans quelques minutes."};
+  let text = "";
+  if (r.body && r.body.getReader){
+    const rd = r.body.getReader(), dec = new TextDecoder(); let n = 0;
+    for (;;){ const {done, value} = await rd.read(); if (done) break; text += dec.decode(value, {stream: true}); const k = (text.match(/\[Event /g) || []).length; if (k !== n){ n = k; msg(`Lichess : ${plural(n, "partie")} reçue${n > 1 ? "s" : ""}…`); setP(Math.min(.9, .05 + n / 2000)); } }
+  } else text = await r.text();
+  const total = await ingest(text);
+  li.last = Date.now(); sync.li = li; ls.set("ce.sync", sync); setP(1);
+  return total;
+}
+$("#syncForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const cc = $("#ccUser").value.trim(), li = $("#liUser").value.trim();
+  const msgEl = $("#syncMsg"), prog = $("#syncProg"), bar = prog.firstElementChild, btn = $("#btnSync");
+  if (!cc && !li){ msgEl.textContent = "Entre au moins un pseudo."; return; }
+  state.cc = cc; state.li = li; ls.set("ce.cc", cc); ls.set("ce.li", li); _auto = null; updateWho();
+  $("#syncBlocked").hidden = true; btn.disabled = true; prog.hidden = false; bar.style.width = "2%";
+  const msg = t => { msgEl.textContent = t; }, report = [];
+  try{
+    for (const [site, user, fn] of [["Chess.com", cc, syncChessCom], ["Lichess", li, syncLichess]]){
+      if (!user) continue;
+      try{ const n = await fn(user, msg, f => { bar.style.width = (f * 100).toFixed(1) + "%"; }); report.push(`${site} : ${plural(n, "nouvelle partie")}`); }
+      catch(err){
+        if (err && err.user){ report.push(err.msg); continue; }
+        if (IN_CLAUDE){ msg(""); $("#syncBlocked").hidden = false; return; }
+        report.push(`Impossible de joindre ${site} pour le moment. Vérifie ta connexion et réessaie dans une minute.`);
+      }
+    }
+    msg(report.join(" · ") + ".");
+    replayCache.clear(); renderGames(); updateBadges();
+  } finally { btn.disabled = false; setTimeout(() => { prog.hidden = true; bar.style.width = "0"; }, 600); }
+});
+function updateWho(){
+  const n = [state.cc, state.li].filter(Boolean).join(" · ") || autoUser();
+  $("#whoChip").innerHTML = n ? `Joueur : <b>${esc(n)}</b>` : "";
+}
+
+/* ================= File d'analyse automatique ================= */
+const Q = {running: false, stop: false};
+function pendingGames(){ return realGames().filter(g => !g.analysis && myColor(g)); }
+function updateQueueOffer(){
+  const p = pendingGames().length;
+  $("#queueOffer").hidden = Q.running || !p;
+  if (p) $("#queueOfferTitle").textContent = `${plural(p, "partie")} pas encore ${p > 1 ? "analysées" : "analysée"}`;
+}
+async function runQueue(n, depth){
+  if (Q.running || engineBusy) return;
+  const list = pendingGames().slice(0, n);
+  if (!list.length) return;
+  Q.running = true; Q.stop = false; engineBusy = true;
+  $("#queueBox").hidden = false; $("#queueStop").hidden = false; updateQueueOffer();
+  let done = 0;
+  try{
+    for (const g of list){
+      if (Q.stop) break;
+      $("#queueMsg").textContent = `Analyse ${done + 1}/${list.length} : contre ${myColor(g) === "w" ? g.black : g.white}`;
+      g.analysis = await analyseGame(g, depth, f => { $("#queueBar").style.width = ((done + f) / list.length * 100).toFixed(1) + "%"; });
+      await Store.saveAnalysis(g);
+      done++;
+      if (state.tab === "games") renderGames();
+      updateBadges();
+    }
+    $("#queueMsg").textContent = Q.stop ? `Analyse arrêtée après ${plural(done, "partie")}.` : `${plural(done, "partie analysée")}. Ton diagnostic est prêt dans Progrès → Mon plan.`;
+  }catch(e){
+    $("#queueMsg").textContent = "Le moteur n'a pas pu démarrer. Essaie avec un navigateur à jour (Chrome, Safari ou Firefox).";
+  }finally{ Q.running = false; engineBusy = false; $("#queueStop").hidden = true; updateQueueOffer(); renderTab(); }
+}
+$("#queueStart").addEventListener("click", () => runQueue(+$("#queueN").value, 10));
+$("#queueStop").addEventListener("click", () => { Q.stop = true; $("#queueMsg").textContent = "Arrêt après la partie en cours…"; });
+
+/* ================= Parties ================= */
+function renderGames(){
+  updateQueueOffer();
+  const tcs = ["Tout", ...new Set(realGames().map(g => g.tc))];
+  if (!tcs.includes(state.filter)) state.filter = "Tout";
+  $("#tcFilters").innerHTML = tcs.length > 2 ? tcs.map(t => `<button aria-pressed="${t === state.filter}" data-f="${esc(t)}">${esc(t)}</button>`).join("") : "";
+  const all = state.games.filter(g => g.example || state.filter === "Tout" || g.tc === state.filter);
+  const list = all.slice(0, state.shown);
+  $("#gameList").innerHTML = `<div class="games">${list.map(g => {
+    const col = myColor(g), o = g.example ? "X" : outcome(g, col);
+    const L = {W:"V", L:"D", D:"½", X:"–"}[o];
+    const opp = col === "w" ? g.black : col === "b" ? g.white : null;
+    const oppElo = col === "w" ? g.belo : col === "b" ? g.welo : null;
+    const who = opp ? `contre ${esc(opp)}${oppElo ? ` <span class="muted mono">(${oppElo})</span>` : ""}` : `${esc(g.white)} – ${esc(g.black)}`;
+    const acc = g.analysis && col ? g.analysis.acc[col] : null;
+    const tags = [g.example ? `<span class="chip ex">Exemple</span>` : `<span class="chip">${esc(g.tc)}${g.src === "lichess" ? " · Lichess" : ""}</span>`];
+    if (acc != null) tags.push(`<span class="chip acc">${acc.toFixed(1)} %</span>`);
+    else if (g.analysis) tags.push(`<span class="chip acc">analysée</span>`);
+    return `<div class="game" data-id="${g.id}" role="button" tabindex="0">
+      <div class="res ${o}" title="${{W:"Victoire", L:"Défaite", D:"Nulle", X:""}[o]}">${L}</div>
+      <div style="min-width:0"><div class="who">${who}</div><div class="meta">${esc(g.opening)} · ${Math.ceil(g.plies / 2)} coups${g.date ? " · " + fmtDate(g.date) : ""}</div></div>
+      <div class="side">${tags.join("<br>")}</div></div>`;
+  }).join("")}${all.length > list.length ? `<button class="more" id="moreGames">Afficher plus (${all.length - list.length} restantes)</button>` : ""}</div>`;
+  const mg = $("#moreGames"); if (mg) mg.addEventListener("click", e => { e.stopPropagation(); state.shown += 50; renderGames(); });
+}
+$("#tcFilters").addEventListener("click", e => { const b = e.target.closest("button[data-f]"); if (b){ state.filter = b.dataset.f; state.shown = 30; renderGames(); } });
+$("#gameList").addEventListener("click", e => { const r = e.target.closest(".game"); if (r) openGame(r.dataset.id); });
+$("#gameList").addEventListener("keydown", e => { if (e.key === "Enter"){ const r = e.target.closest(".game"); if (r) openGame(r.dataset.id); } });
+async function doImport(text){
+  const parts = splitPgn(text);
+  if (!parts.length){ $("#importMsg").textContent = "Aucune partie trouvée dans ce texte."; return 0; }
+  const games = []; let bad = 0;
+  for (const p of parts){ const g = makeGame(p); if (g) games.push(g); else bad++; }
+  const fresh = games.filter(g => !state.games.some(x => x.id === g.id));
+  const added = addGames(fresh), dup = games.length - added;
+  $("#importMsg").textContent = `${plural(added, "partie ajoutée")}` + (dup ? `, ${dup} déjà présente${dup > 1 ? "s" : ""}` : "") + (bad ? `, ${bad} illisible${bad > 1 ? "s" : ""}` : "") + ".";
+  updateWho(); renderGames(); updateBadges();
+  await Store.putMany(fresh);
+  return added;
+}
+$("#btnImport").addEventListener("click", async () => { if (await doImport($("#pgnInput").value)) $("#pgnInput").value = ""; });
+$("#fileInput").addEventListener("change", async e => { let text = ""; for (const f of e.target.files) text += "\n\n" + await f.text(); e.target.value = ""; doImport(text); });
+
+/* Sauvegarde (hors Claude) */
+$("#btnExport").addEventListener("click", () => {
+  const data = {v: 1, at: new Date().toISOString(), cc: state.cc, li: state.li, games: realGames(), reps: state.reps, srs: state.srs, course: state.course, solved: state.solved};
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data)], {type: "application/json"}));
+  const a = document.createElement("a"); a.href = url; a.download = `carnet-echecs-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  $("#backupMsg").textContent = "Fichier de sauvegarde créé.";
+});
+$("#backupInput").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try{
+    const d = JSON.parse(await f.text());
+    const n = addGames((d.games || []).filter(g => g && g.pgn && g.id)); await Store.putMany(d.games || []);
+    for (const r of (d.reps || [])) if (!state.reps.some(x => x.id === r.id)) state.reps.push(r);
+    Object.assign(state.srs, d.srs || {}); Object.assign(state.course, d.course || {}); Object.assign(state.solved, d.solved || {});
+    Store.kvSet("reps", state.reps); Store.kvSet("srs", state.srs); Store.kvSet("course", state.course); ls.set("ce.solved", state.solved);
+    if (d.cc && !state.cc){ state.cc = d.cc; $("#ccUser").value = d.cc; ls.set("ce.cc", d.cc); }
+    if (d.li && !state.li){ state.li = d.li; $("#liUser").value = d.li; ls.set("ce.li", d.li); }
+    $("#backupMsg").textContent = `Sauvegarde importée : ${plural(n, "partie ajoutée")}.`;
+    replayCache.clear(); _auto = null; renderGames(); updateBadges();
+  }catch(err){ $("#backupMsg").textContent = "Ce fichier n'est pas une sauvegarde du carnet."; }
+});
+
+/* ================= Analyse ================= */
+function openGame(id, ply){
+  const g = state.games.find(x => x.id === id); if (!g) return;
+  showGame(g, ply);
+}
+function showGame(g, ply){ state.cur = g; state.ply = ply || 0; state.flip = myColor(g) === "b"; setTab("analyse"); }
+const CLS = {gaffe:["Gaffe", "??"], err:["Erreur", "?"], impr:["Imprécision", "?!"], best:["Meilleur coup", ""], ok:["Bon coup", ""]};
+function renderAnalyse(){
+  if (!state.cur) state.cur = state.games[0];
+  const g = state.cur; if (!g) return;
+  const {moves} = replay(g), A = g.analysis, col = myColor(g);
+  $("#anMeta").textContent = [g.example ? "Exemple" : g.tc, g.date ? fmtDate(g.date) : "", g.termination].filter(Boolean).join(" · ");
+  $("#anTitle").textContent = g.opening;
+  const pl = c => {
+    const nm = c === "w" ? g.white : g.black, elo = c === "w" ? g.welo : g.belo, acc = A ? A.acc[c] : null;
+    return `<div class="pl"><span class="dot ${c}"></span><span class="nm">${esc(nm)}${col === c ? " (toi)" : ""}</span>${elo ? `<span class="muted mono">${elo}</span>` : ""}</div>${acc != null ? `<span class="acc" title="Précision">${acc.toFixed(1)} %</span>` : ""}`;
+  };
+  $("#plTop").innerHTML = pl(state.flip ? "w" : "b");
+  $("#plBot").innerHTML = pl(state.flip ? "b" : "w");
+  $("#anRun").hidden = !!A;
+  $("#btnAnalyse").disabled = engineBusy;
+  $("#anStatus").textContent = engineBusy && !A && Q.running ? "L'analyse automatique est en cours (onglet Parties). Cette partie pourra être analysée ensuite." : "";
+  $("#anArea").classList.toggle("noeval", !A);
+  $("#evalbar").hidden = !A;
+  if (A){
+    const cnt = c => ({w: A.cls.filter((x, i) => x === c && moves[i].color === "w").length, b: A.cls.filter((x, i) => x === c && moves[i].color === "b").length});
+    const box = (c, lab) => { const n = cnt(c); return `<div><b class="g ${c}">${col ? n[col] : n.w + n.b}</b><span>${lab}</span>${col ? `<span class="cw muted">adv. ${n[col === "w" ? "b" : "w"]}</span>` : ""}</div>`; };
+    $("#anCounts").innerHTML = `<div class="counts">${box("best", "Meilleurs")}${box("impr", "Imprécisions")}${box("err", "Erreurs")}${box("gaffe", "Gaffes")}</div>`;
+  } else $("#anCounts").innerHTML = "";
+  const off = moves.length && moves[0].color === "b" ? 1 : 0;
+  let ml = "";
+  if (off) ml += `<div class="n">${Math.ceil((+replay(g).fens[0].split(" ")[5]) || 1)}.</div><div></div>`;
+  for (let i = 0; i < moves.length; i++){
+    if (moves[i].color === "w") ml += `<div class="n">${replay(g).fens[i].split(" ")[5]}.</div>`;
+    const c = A ? A.cls[i] : "", gl = c && CLS[c] ? CLS[c][1] : "";
+    ml += `<button data-ply="${i + 1}">${esc(frSan(moves[i].san))}${gl ? `<span class="g ${c}">${gl}</span>` : ""}</button>`;
+  }
+  $("#moveList").innerHTML = ml;
+  drawGraph(); showPly();
+}
+function showPly(){
+  const g = state.cur; if (!g) return;
+  const {fens, moves} = replay(g), A = g.analysis, p = state.ply;
+  const last = p > 0 ? moves[p - 1] : null, arrows = [];
+  if (A && p > 0 && !["best", "ok"].includes(A.cls[p - 1]) && A.best[p - 1]) arrows.push({uci: A.best[p - 1], color: "var(--c-best)"});
+  drawBoard($("#anBoard"), fens[p], {flip: state.flip, last, arrows});
+  for (const b of document.querySelectorAll("#moveList button")) b.classList.toggle("on", +b.dataset.ply === p);
+  const on = document.querySelector("#moveList button.on");
+  if (on){ const box = $("#moveList"); const t = on.offsetTop - box.offsetTop; if (t < box.scrollTop || t > box.scrollTop + box.clientHeight - 30) box.scrollTop = t - box.clientHeight / 2; }
+  if (A){
+    $("#evalbar").classList.toggle("flip", state.flip);
+    $("#evalfill").style.height = winP(A.ev[p]) + "%";
+    const t = evalText(A.ev[p], A.mt[p]);
+    $(state.flip ? "#evalBot" : "#evalTop").textContent = A.ev[p] < 0 ? t : "";
+    $(state.flip ? "#evalTop" : "#evalBot").textContent = A.ev[p] >= 0 ? t : "";
+    $("#evalTop").style.color = state.flip ? "var(--eval-b)" : "var(--eval-w)";
+    $("#evalBot").style.color = state.flip ? "var(--eval-w)" : "var(--eval-b)";
+  }
+  const cur = $("#curMove"); cur.className = "cur";
+  if (!last){ cur.innerHTML = `<div class="muted">Position de départ. Utilise ▶ ou touche un coup pour avancer${A ? ", ou touche la courbe pour sauter à un moment clé" : ""}.</div>`; return; }
+  const num = fens[p - 1].split(" ")[5] + (last.color === "w" ? ". " : "… ");
+  let html = `<div class="row between"><span class="mv">${num}${esc(frSan(last.san))}</span>`;
+  if (A){
+    const c = A.cls[p - 1]; cur.classList.add(c);
+    html += `<span class="tag ${c}">${CLS[c][0]}</span></div><div class="note">Évaluation : <span class="mono">${evalText(A.ev[p], A.mt[p])}</span>`;
+    if (c !== "best" && A.best[p - 1]){
+      html += ` · Meilleur : <b class="mono">${esc(frSan(uciToSan(fens[p - 1], A.best[p - 1])))}</b> <span class="mono">(${evalText(A.ev[p - 1], A.mt[p - 1])})</span>`;
+      const line = pvToSan(fens[p - 1], A.pv[p - 1]);
+      if (line.length > 1) html += `<br>Suite : <span class="mono">${esc(line.map(frSan).join(" "))}</span>`;
+    }
+    html += `</div>`;
+    if (["gaffe", "err", "impr"].includes(c) && state.sample) html += `<div class="row" style="margin-top:8px"><button class="btn sm" id="btnWhy">Pourquoi ? Demander au coach</button></div><div class="explain" id="why"></div>`;
+  } else html += `</div>`;
+  cur.innerHTML = html;
+  const bw = $("#btnWhy"); if (bw) bw.addEventListener("click", () => explain(p));
+}
+function drawGraph(){
+  const g = state.cur, A = g && g.analysis, svg = $("#graph");
+  if (!A){ svg.style.display = "none"; return; }
+  svg.style.display = "";
+  const W = 600, H = 110, n = A.ev.length - 1 || 1;
+  const pts = A.ev.map((v, i) => [i / n * W, H - winP(v) / 100 * H]);
+  const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  let dots = "";
+  A.cls.forEach((c, i) => { if (c === "gaffe" || c === "err"){ const p = pts[i + 1]; dots += `<circle cx="${p[0]}" cy="${p[1]}" r="3.4" fill="var(--c-${c})" stroke="var(--eval-b)" stroke-width="1"/>`; } });
+  const cx = state.ply / n * W;
+  svg.innerHTML = `<path d="${line} L${W} ${H} L0 ${H} Z" fill="var(--eval-w)"/>`
+    + `<line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="var(--muted)" stroke-dasharray="3 4" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+    + `<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`
+    + dots + `<line id="gcur" x1="${cx}" y1="0" x2="${cx}" y2="${H}" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+}
+function go(p){
+  const g = state.cur; if (!g) return;
+  state.ply = Math.max(0, Math.min(replay(g).moves.length, p));
+  showPly();
+  const gc = $("#gcur"); if (gc && g.analysis){ const x = state.ply / (g.analysis.ev.length - 1 || 1) * 600; gc.setAttribute("x1", x); gc.setAttribute("x2", x); }
+}
+$("#bFirst").onclick = () => go(0);
+$("#bPrev").onclick = () => go(state.ply - 1);
+$("#bNext").onclick = () => go(state.ply + 1);
+$("#bLast").onclick = () => go(1e9);
+$("#bFlip").onclick = () => { state.flip = !state.flip; renderAnalyse(); };
+$("#bPlayHere").onclick = () => { const g = state.cur; if (!g) return; const fen = replay(g).fens[state.ply]; newPlay({fen, color: turnOf(fen)}); setTab("play"); };
+$("#moveList").addEventListener("click", e => { const b = e.target.closest("button[data-ply]"); if (b) go(+b.dataset.ply); });
+$("#graph").addEventListener("click", e => { const g = state.cur; if (!g || !g.analysis) return; const r = e.currentTarget.getBoundingClientRect(); go(Math.round((e.clientX - r.left) / r.width * (g.analysis.ev.length - 1))); });
+document.addEventListener("keydown", e => {
+  if (state.tab !== "analyse" || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (e.key === "ArrowLeft") go(state.ply - 1); else if (e.key === "ArrowRight") go(state.ply + 1);
+});
+$("#btnAnalyse").addEventListener("click", async () => {
+  const g = state.cur; if (!g || engineBusy) return;
+  engineBusy = true; const btn = $("#btnAnalyse"); btn.disabled = true;
+  const prog = $("#anProg"); prog.hidden = false; const bar = prog.firstElementChild;
+  $("#anStatus").textContent = "Chargement du moteur…";
+  try{
+    const A = await analyseGame(g, +$("#depth").value, f => { bar.style.width = (f * 100).toFixed(1) + "%"; $("#anStatus").textContent = `Analyse en cours… ${Math.round(f * 100)} %`; });
+    g.analysis = A; await Store.saveAnalysis(g);
+    const col = myColor(g), {moves} = replay(g);
+    const k = A.cls.findIndex((c, i) => (c === "gaffe" || c === "err") && (!col || moves[i].color === col));
+    engineBusy = false;
+    if (state.cur === g){ state.ply = k >= 0 ? k + 1 : 0; renderAnalyse(); }
+    updateBadges();
+  }catch(err){
+    $("#anStatus").textContent = "Le moteur n'a pas pu démarrer. Réessaie dans un navigateur à jour (Chrome, Safari ou Firefox).";
+  }finally{ engineBusy = false; btn.disabled = false; prog.hidden = true; bar.style.width = "0"; }
+});
+async function explain(p){
+  const g = state.cur, A = g.analysis, {fens, moves} = replay(g), out = $("#why"), btn = $("#btnWhy");
+  if (!state.sample || !out) return;
+  btn.disabled = true; out.textContent = "Le coach réfléchit…";
+  const mover = moves[p - 1].color === "w" ? "Blancs" : "Noirs";
+  const prompt = `Tu es un entraîneur d'échecs bienveillant qui s'adresse à un joueur amateur. Réponds en français, en 4 phrases maximum, sans titre ni liste. Utilise la notation algébrique française (R=roi, D=dame, T=tour, F=fou, C=cavalier).
+
+Position avant le coup (FEN) : ${fens[p - 1]}
+Trait aux ${mover}. Coup joué : ${frSan(moves[p - 1].san)} (classé « ${CLS[A.cls[p - 1]][0]} » par le moteur).
+Évaluation avant le coup : ${evalText(A.ev[p - 1], A.mt[p - 1])} ; après : ${evalText(A.ev[p], A.mt[p])} (positif = avantage Blancs).
+Meilleur coup selon Stockfish : ${frSan(uciToSan(fens[p - 1], A.best[p - 1]))}, ligne principale : ${pvToSan(fens[p - 1], A.pv[p - 1]).map(frSan).join(" ")}.
+Suite après le coup joué selon le moteur : ${pvToSan(fens[p], A.pv[p]).map(frSan).join(" ") || "(fin de partie)"}.
+
+Explique concrètement ce que le coup joué a négligé, pourquoi le meilleur coup est supérieur, puis donne une idée simple à retenir. Ne contredis pas les évaluations du moteur.`;
+  try{ const r = await state.sample(prompt, {onText: u => { out.textContent = u.text; }}); out.textContent = r.text; }
+  catch(e){ out.textContent = e && e.code === "rate_limited" ? "Le coach est très sollicité, réessaie dans une minute." : "Le coach n'est pas disponible pour le moment."; if (e && e.code === "not_granted") state.sample = null; }
+  finally{ btn.disabled = false; }
+}
+
+/* ================= Diagnostic ================= */
+function moveFacts(g, col){
+  const A = g.analysis, {fens, moves} = replay(g), s = col === "w" ? 1 : -1, out = [];
+  const lowT = Math.max(20, (g.base || 0) * 0.1);
+  let myIdx = 0;
+  for (let i = 0; i < moves.length; i++){
+    if (moves[i].color !== col) continue;
+    const c = A.cls[i], bad = c === "gaffe" || c === "err";
+    const f = {i, cls: c, bad, ph: A.ph[i], hang: false, opp: false, miss: false, mateOpp: false, mateMiss: false, low: null};
+    if (bad && A.best[i + 1]){
+      const p = new Chess(fens[i + 1]).get(A.best[i + 1].slice(2, 4));
+      if (p && p.color === col && p.type !== "p" && p.type !== "k") f.hang = true;
+    }
+    if (i >= 1 && (A.cls[i - 1] === "gaffe" || A.cls[i - 1] === "err")){ f.opp = true; f.miss = !["best", "ok"].includes(c); }
+    const m = A.mt[i];
+    if (m != null && m !== 0 && m * s > 0 && Math.abs(m) <= 3){ f.mateOpp = true; const m2 = A.mt[i + 1]; f.mateMiss = !(m2 === 0 || (m2 != null && m2 * s > 0)); }
+    if (g.clk && g.base > 0 && g.clk.length === moves.length){ const before = i >= 2 ? g.clk[i - 2] : g.base; f.low = before < lowT; }
+    myIdx++;
+    out.push(f);
+  }
+  return out;
+}
+function catsOf(f){
+  const c = [];
+  if (f.hang) c.push("hang");
+  if (f.mateMiss) c.push("mate");
+  if (f.opp && f.miss) c.push("missed");
+  c.push({o: "opening", m: "middle", f: "endgame"}[f.ph]);
+  if (f.low) c.push("time");
+  return c;
+}
+const LINK = {
+  puzzles: ["Problèmes Chess.com", "https://www.chess.com/puzzles"],
+  lessons: ["Leçons Chess.com", "https://www.chess.com/lessons"],
+  hanging: ["Lichess : pièces en prise", "https://lichess.org/training/hangingPiece"],
+  themes: ["Lichess : thèmes tactiques", "https://lichess.org/training/themes"],
+  fork: ["Lichess : fourchettes", "https://lichess.org/training/fork"],
+  pin: ["Lichess : clouages", "https://lichess.org/training/pin"],
+  mate1: ["Lichess : mat en 1", "https://lichess.org/training/mateIn1"],
+  mate2: ["Lichess : mat en 2", "https://lichess.org/training/mateIn2"],
+  opening: ["Lichess : exercices d'ouverture", "https://lichess.org/training/opening"],
+  explorer: ["Lichess : explorateur d'ouvertures", "https://lichess.org/opening"],
+  middle: ["Lichess : milieu de partie", "https://lichess.org/training/middlegame"],
+  endgame: ["Lichess : exercices de finale", "https://lichess.org/training/endgame"],
+  practice: ["Lichess Practice", "https://lichess.org/practice"],
+  storm: ["Lichess Puzzle Storm", "https://lichess.org/storm"],
+  crushing: ["Lichess : écraser l'adversaire", "https://lichess.org/training/crushing"]
+};
+/* Chaque catégorie renvoie vers un parcours de cours interne (course) */
+const CATS = {
+  hang: {t: "Pièces laissées en prise", bench: .35, links: ["hanging", "puzzles"], course: "tactique",
+    why: "Une pièce donnée gratuitement décide la plupart des parties amateurs. C'est le gain de points le plus rapide.",
+    how: ["Avant de lâcher ta pièce, fais le contrôle anti-gaffe : que menace l'adversaire, quelles pièces deviennent attaquées ?", "Repère les pièces non défendues, les tiennes comme celles de l'adversaire.", "Fais 10 problèmes « pièce en prise » par jour pendant deux semaines."]},
+  missed: {t: "Erreurs adverses non punies", bench: .45, pct: true, links: ["themes", "fork", "pin"], course: "tactique",
+    why: "Quand l'adversaire se trompe, il faut le voir tout de suite. Sinon l'occasion disparaît au coup suivant.",
+    how: ["Après chaque coup adverse, demande-toi ce qui a changé et ce qui n'est plus défendu.", "Cherche d'abord les échecs, puis les prises, puis les menaces.", "Travaille les motifs : fourchette, clouage, enfilade, attaque à la découverte."]},
+  mate: {t: "Mats manqués", bench: .3, pct: true, links: ["mate1", "mate2"], course: "mats",
+    why: "Un mat en 1, 2 ou 3 coups était disponible et n'a pas été joué. Ces occasions sont rares, il faut les saisir.",
+    how: ["Quand le roi adverse est exposé, examine tous les échecs, même ceux qui sacrifient du matériel.", "Apprends les motifs de mat classiques du parcours « Les mats de base ».", "Fais des séries de mats en 1 puis en 2 pour automatiser la vision."]},
+  opening: {t: "Ouverture", bench: .04, pct: true, links: ["opening", "explorer"], course: "ouv",
+    why: "Une mauvaise ouverture te met en difficulté avant même que la partie commence vraiment.",
+    how: ["Applique les principes : centre, développement, roque.", "Construis ton répertoire dans S'entraîner → Répertoire et révise-le chaque jour.", "Après chaque partie, regarde où tu as quitté ton répertoire."]},
+  middle: {t: "Milieu de partie", bench: .08, pct: true, links: ["middle", "themes"], course: "tactique",
+    why: "C'est la phase la plus longue et la plus tactique : c'est souvent là que les parties se décident.",
+    how: ["Avant chaque coup : échecs, prises, menaces, pour toi et pour l'adversaire.", "Améliore ta pièce la moins active quand il n'y a rien de tactique.", "Fais des exercices tactiques mixtes chaque jour."]},
+  endgame: {t: "Finales", bench: .08, pct: true, links: ["endgame", "practice"], course: "finales",
+    why: "Beaucoup de parties gagnées se terminent par une nulle ou une défaite en finale, faute de technique.",
+    how: ["Active ton roi dès que les dames sont échangées.", "Maîtrise la règle du carré, Philidor et Lucena (parcours « Finales à connaître »).", "Rejoue des finales contre Stockfish depuis tes propres parties."]},
+  time: {t: "Gestion du temps", bench: 1.6, ratio: true, links: ["storm"], course: null,
+    why: "Tes erreurs augmentent nettement quand ta pendule est presque vide.",
+    how: ["Joue rapidement les coups de ton répertoire pour garder du temps.", "Réfléchis longtemps seulement aux moments critiques (prises, changement de plan).", "Privilégie les cadences avec incrément (10+5, 15+10)."]},
+  convert: {t: "Conclure les parties gagnées", bench: .2, pct: true, links: ["crushing", "endgame"], course: "finales",
+    why: "Tu obtiens des positions gagnantes mais tu ne les transformes pas toujours en victoire.",
+    how: ["Avec l'avantage matériel, échange les pièces, pas les pions.", "Supprime le contre-jeu adverse avant d'attaquer.", "Méfie-toi du pat et des échecs perpétuels."]}
+};
+function computeDiag(){
+  const games = realGames().filter(g => g.analysis && myColor(g));
+  const d = {n: games.length, hang: 0, opp: 0, miss: 0, mateOpp: 0, mateMiss: 0, ph: {o:{m:0,e:0}, m:{m:0,e:0}, f:{m:0,e:0}}, low:{m:0,e:0}, norm:{m:0,e:0}, winning: 0, notWon: 0};
+  for (const g of games){
+    const col = myColor(g), s = col === "w" ? 1 : -1;
+    for (const f of moveFacts(g, col)){
+      if (f.hang) d.hang++;
+      if (f.opp){ d.opp++; if (f.miss) d.miss++; }
+      if (f.mateOpp){ d.mateOpp++; if (f.mateMiss) d.mateMiss++; }
+      d.ph[f.ph].m++; if (f.bad) d.ph[f.ph].e++;
+      if (f.low !== null){ const b = f.low ? d.low : d.norm; b.m++; if (f.bad) b.e++; }
+    }
+    const best = Math.max(...g.analysis.ev.map(v => winP(s * v)));
+    if (best >= 90){ d.winning++; if (outcome(g, col) !== "W") d.notWon++; }
+  }
+  const pct = v => (v * 100).toFixed(v < .1 ? 1 : 0) + " %";
+  const cat = {};
+  cat.hang = {v: d.n ? d.hang / d.n : 0, ok: d.n >= 3, txt: d.n ? (d.hang / d.n).toFixed(2) + " par partie" : "", lab: "Pièces perdues par une gaffe, par partie"};
+  cat.missed = {v: d.opp ? d.miss / d.opp : 0, ok: d.opp >= 5, txt: d.opp ? `${pct(d.miss / d.opp)} (${d.miss}/${d.opp})` : "", lab: "Part des erreurs adverses que tu n'as pas punies"};
+  cat.mate = {v: d.mateOpp ? d.mateMiss / d.mateOpp : 0, ok: d.mateOpp >= 3, txt: d.mateOpp ? `${pct(d.mateMiss / d.mateOpp)} (${d.mateMiss}/${d.mateOpp})` : "", lab: "Part des mats en 1 à 3 coups ratés"};
+  for (const [k, p] of [["opening", "o"], ["middle", "m"], ["endgame", "f"]]){ const v = d.ph[p]; cat[k] = {v: v.m ? v.e / v.m : 0, ok: v.m >= 30, txt: v.m ? `${pct(v.e / v.m)} (${v.e}/${v.m})` : "", lab: "Part de tes coups en erreur ou gaffe dans cette phase"}; }
+  const rl = d.low.m ? d.low.e / d.low.m : 0, rn = d.norm.m ? d.norm.e / d.norm.m : 0;
+  cat.time = {v: rn ? rl / rn : (rl ? 3 : 0), ok: d.low.m >= 10 && d.norm.m >= 30, txt: d.low.m ? `${pct(rl)} contre ${pct(rn)}` : "", lab: "Taux d'erreur avec moins de 10 % du temps, comparé au reste"};
+  cat.convert = {v: d.winning ? d.notWon / d.winning : 0, ok: d.winning >= 3, txt: d.winning ? `${pct(d.notWon / d.winning)} (${d.notWon}/${d.winning})` : "", lab: "Parties où tu as été gagnant sans gagner"};
+  for (const k in cat) cat[k].sev = cat[k].v / CATS[k].bench;
+  d.cat = cat;
+  return d;
+}
+function sevLabel(s, ok){
+  if (!ok) return ["p0", "Pas assez de données"];
+  if (s >= 1.3) return ["p1", "Priorité"];
+  if (s >= .8) return ["p2", "À travailler"];
+  return ["p3", "Point solide"];
+}
+
+/* ================= Progrès : statistiques ================= */
+function niceTicks(min, max, n){
+  const span = max - min || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || mag * 10;
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step, t = [];
+  for (let v = lo; v <= hi + step / 2; v += step) t.push(Math.round(v * 100) / 100);
+  return t;
+}
+function lineChart(vals, o){
+  const W = 560, H = 190, L = 40, R = 12, T = 12, Bm = 24;
+  if (vals.length < 2) return `<div class="empty" style="padding:18px">${o.empty}</div>`;
+  let mn = Math.min(...vals), mx = Math.max(...vals);
+  if (o.min != null) mn = Math.min(mn, o.min); if (o.max != null) mx = Math.max(mx, o.max);
+  const ticks = niceTicks(mn, mx, 4), y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const x = i => L + i / (vals.length - 1) * (W - L - R), y = v => T + (1 - (v - y0) / (y1 - y0 || 1)) * (H - T - Bm);
+  const grid = ticks.map(t => `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--f-mono)">${t}</text>`).join("");
+  const path = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
+  const k = Math.max(3, Math.round(vals.length / 8)), ma = vals.map((_, i) => { const s = vals.slice(Math.max(0, i - k + 1), i + 1); return s.reduce((a, b) => a + b, 0) / s.length; });
+  const mpath = ma.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label)}">${grid}
+    <path d="${path} L${x(vals.length - 1)} ${H - Bm} L${L} ${H - Bm} Z" fill="var(--accent)" opacity=".08"/>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="1.2" opacity=".45"/>
+    <path d="${mpath}" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+    <circle cx="${x(vals.length - 1)}" cy="${y(vals[vals.length - 1])}" r="4" fill="var(--accent)"/>
+    <text x="${L}" y="${H - 6}" font-size="11" fill="var(--muted)">${esc(o.from || "")}</text>
+    <text x="${W - R}" y="${H - 6}" font-size="11" fill="var(--muted)" text-anchor="end">${esc(o.to || "")}</text></svg>`;
+}
+function computeStats(){
+  const games = realGames().map(g => ({g, col: myColor(g)})).filter(x => x.col).sort((a, b) => (a.g.date + a.g.time).localeCompare(b.g.date + b.g.time));
+  const s = {games, W:0, D:0, L:0, byColor:{w:{n:0, pts:0}, b:{n:0, pts:0}}, openings:{}, tcs:{}, analysed:[], gaffes: 0};
+  for (const {g, col} of games){
+    const o = outcome(g, col), pts = o === "W" ? 1 : o === "D" ? .5 : 0;
+    if (o !== "X"){ s[o]++; s.byColor[col].n++; s.byColor[col].pts += pts; }
+    const fam = openingFamily(g.opening), key = fam + "|" + col;
+    const op = s.openings[key] || (s.openings[key] = {name: fam, col, n:0, pts:0});
+    op.n++; op.pts += pts;
+    const elo = col === "w" ? g.welo : g.belo;
+    if (elo){ const k = g.tc + (g.src === "lichess" ? " Lichess" : ""); (s.tcs[k] || (s.tcs[k] = [])).push({elo, date: g.date}); }
+    if (g.analysis){ s.analysed.push({g, col, acc: g.analysis.acc[col]}); const {moves} = replay(g); s.gaffes += g.analysis.cls.filter((c, i) => c === "gaffe" && moves[i].color === col).length; }
+  }
+  return s;
+}
+function renderStats(){
+  const el = $("#progStats"), s = computeStats();
+  if (!s.games.length){
+    el.innerHTML = `<div class="empty"><div class="big">♜</div><h3 style="color:var(--fg);margin:6px 0">Tes statistiques apparaîtront ici</h3><p style="max-width:52ch;margin:0 auto">Synchronise tes parties avec ton pseudo dans l'onglet <b>Parties</b>.</p></div>`;
+    return;
+  }
+  const n = s.W + s.D + s.L, score = n ? Math.round((s.W + s.D / 2) / n * 100) : 0;
+  const accs = s.analysed.map(a => a.acc).filter(v => v != null);
+  const avgAcc = accs.length ? (accs.reduce((a, b) => a + b, 0) / accs.length).toFixed(1) : "–";
+  const tcMain = Object.entries(s.tcs).sort((a, b) => b[1].length - a[1].length)[0];
+  const tcSel = state.tcSel && s.tcs[state.tcSel] ? state.tcSel : (tcMain ? tcMain[0] : null);
+  const eloSeries = tcSel ? s.tcs[tcSel] : [];
+  const curElo = eloSeries.length ? eloSeries[eloSeries.length - 1].elo : null;
+  const gpg = s.analysed.length ? (s.gaffes / s.analysed.length).toFixed(1) : "–";
+  let html = `<div class="kpis">
+    <div class="kpi"><b>${s.games.length}</b><span>parties</span></div>
+    <div class="kpi"><b>${s.W}<span class="muted" style="font-size:1rem"> / ${s.D} / </span>${s.L}</b><span>V / N / D · score ${score} %</span></div>
+    <div class="kpi"><b>${curElo || "–"}</b><span>Elo ${tcSel ? esc(tcSel.toLowerCase()) : ""} actuel</span></div>
+    <div class="kpi"><b>${avgAcc}${accs.length ? " %" : ""}</b><span>précision moyenne (${s.analysed.length} analysée${s.analysed.length > 1 ? "s" : ""})</span></div>
+    <div class="kpi"><b>${gpg}</b><span>gaffes par partie</span></div>
+  </div>`;
+  const tcList = Object.keys(s.tcs);
+  html += `<div class="two"><div class="panel stack"><div class="row between"><h3>Évolution de ton Elo</h3>
+    <div class="filters" id="eloF">${tcList.length > 1 ? tcList.map(t => `<button aria-pressed="${t === tcSel}" data-tc="${esc(t)}">${esc(t)}</button>`).join("") : ""}</div></div>
+    ${lineChart(eloSeries.map(e => e.elo), {label:"Elo", empty:"Il faut au moins 2 parties classées.", from: fmtDate(eloSeries[0] && eloSeries[0].date), to: fmtDate(eloSeries.length && eloSeries[eloSeries.length - 1].date)})}
+    <div class="note">Trait épais : moyenne glissante.</div></div>`;
+  const accSeries = s.analysed.filter(a => a.acc != null);
+  html += `<div class="panel stack"><h3>Précision des parties analysées</h3>
+    ${lineChart(accSeries.map(a => a.acc), {label:"Précision", min: 50, max: 100, empty:"Analyse au moins 2 parties pour voir ta courbe de précision.", from: fmtDate(accSeries[0] && accSeries[0].g.date), to: fmtDate(accSeries.length && accSeries[accSeries.length - 1].g.date)})}
+    <div class="note">100 % = tous tes coups conservent tes chances de gain comme le moteur.</div></div></div>`;
+  const colRow = (c, lab) => { const v = s.byColor[c]; return `<tr><td>${lab}</td><td class="num">${v.n}</td><td class="num">${v.n ? Math.round(v.pts / v.n * 100) + " %" : "–"}</td><td style="width:35%"><div class="bar"><div style="width:${v.n ? v.pts / v.n * 100 : 0}%;background:var(--win)"></div></div></td></tr>`; };
+  const opAll = Object.values(s.openings).sort((a, b) => b.n - a.n).slice(0, 15);
+  html += `<div class="two"><div class="panel stack"><h3>Score par couleur</h3><div class="tbl-wrap"><table><thead><tr><th>Couleur</th><th class="num">Parties</th><th class="num">Score</th><th></th></tr></thead><tbody>${colRow("w", "Blancs")}${colRow("b", "Noirs")}</tbody></table></div></div>
+  <div class="panel stack"><h3>Tes ouvertures</h3><div class="tbl-wrap"><table><thead><tr><th>Ouverture</th><th>Couleur</th><th class="num">Parties</th><th class="num">Score</th><th></th></tr></thead><tbody>
+    ${opAll.map(o => { const sc = o.pts / o.n * 100; return `<tr><td>${esc(o.name)}</td><td>${o.col === "w" ? "Blancs" : "Noirs"}</td><td class="num">${o.n}</td><td class="num">${Math.round(sc)} %</td><td style="width:18%"><div class="bar"><div style="width:${sc}%;background:${sc >= 55 ? "var(--win)" : sc < 45 ? "var(--loss)" : "var(--draw)"}"></div></div></td></tr>`; }).join("")}
+    </tbody></table></div></div></div>`;
+  el.innerHTML = html;
+  const ef = $("#eloF"); if (ef) ef.addEventListener("click", e => { const b = e.target.closest("button[data-tc]"); if (b){ state.tcSel = b.dataset.tc; renderStats(); } });
+}
+
+/* ================= Progrès : mon plan ================= */
+function renderPlan(){
+  const el = $("#progPlan"), d = computeDiag();
+  const total = realGames().filter(g => myColor(g)).length;
+  if (!d.n){
+    el.innerHTML = `<div class="empty"><div class="big">♛</div><h3 style="color:var(--fg);margin:6px 0">Ton diagnostic apparaîtra ici</h3>
+      <p style="max-width:56ch;margin:0 auto">${total ? `Tu as ${plural(total, "partie")}. Lance l'analyse automatique dans l'onglet <b>Parties</b> : 10 à 25 parties suffisent pour un premier diagnostic.` : `Synchronise tes parties dans l'onglet <b>Parties</b>, puis lance l'analyse automatique.`}</p>
+      <p style="margin-top:12px"><button class="btn primary" id="goGames">Aller aux parties</button></p></div>`;
+    $("#goGames").onclick = () => setTab("games"); return;
+  }
+  const order = Object.keys(CATS).sort((a, b) => (d.cat[b].ok - d.cat[a].ok) || (d.cat[b].sev - d.cat[a].sev));
+  const prio = order.filter(k => d.cat[k].ok && d.cat[k].sev >= .8).slice(0, 3);
+  let html = `<div class="stack" style="gap:6px"><div class="eyebrow">Basé sur ${plural(d.n, "partie analysée")}${total > d.n ? ` sur ${total}` : ""}</div>
+    <h2>${prio.length ? `${prio.length > 1 ? "Tes priorités" : "Ta priorité"} : ${prio.map(k => CATS[k].t.toLowerCase()).join(", ")}` : "Pas de faiblesse marquée pour l'instant"}</h2>
+    <p class="note">Chaque point est comparé à un repère indicatif de joueur de club (trait noir sur la jauge). ${d.n < 10 ? "Analyse au moins 10 parties pour un diagnostic fiable." : ""}</p></div>`;
+  const top = prio.length ? prio : order.filter(k => d.cat[k].ok).slice(0, 2);
+  const dueN = dueCards().length;
+  if (top.length){
+    const a = top[0], b = top[1] || top[0], c = top[2] || a;
+    const crs = k => CATS[k].course ? `le parcours « ${COURSES.find(x => x.id === CATS[k].course).t} »` : `les conseils « ${CATS[k].t} »`;
+    const days = [
+      ["Lundi", `Lis ${crs(a)}, puis 15 min d'exercices sur ce thème.`],
+      ["Mardi", `Refais tes exercices « ${CATS[a].t} » tirés de tes parties.`],
+      ["Mercredi", `Révise ton répertoire (10 min), puis 2 parties lentes analysées ici.`],
+      ["Jeudi", `Travaille ${crs(b)} et 15 min d'exercices.`],
+      ["Vendredi", `20 min de tactique variée (${CATS[c].t.toLowerCase()} en priorité).`],
+      ["Samedi", `2 parties lentes + analyse : tes erreurs prioritaires diminuent-elles ?`],
+      ["Dimanche", `Rejoue une finale de tes parties contre Stockfish, ou repos.`]
+    ];
+    html += `<div class="panel stack"><div class="row between"><h3>Ton plan de la semaine</h3>${state.sample ? `<button class="btn sm" id="btnCoachPlan">Personnaliser avec le coach</button>` : ""}</div>
+      ${dueN ? `<div class="warn">${plural(dueN, "position")} de ton répertoire à réviser aujourd'hui. <button class="btn sm" id="goRev">Réviser</button></div>` : ""}
+      <div class="week">${days.map(([j, t]) => `<div class="day"><b>${j}</b>${esc(t)}</div>`).join("")}</div>
+      <div class="coach" id="coachPlan"></div></div>`;
+  }
+  html += `<h2 style="margin-top:6px">Tes lacunes et comment progresser</h2>`;
+  for (const k of order){
+    const C = CATS[k], v = d.cat[k], [cl, lab] = sevLabel(v.sev, v.ok), np = realPuzzles().filter(z => z.cats.includes(k)).length;
+    const fill = Math.min(100, v.sev / 2 * 100);
+    const course = C.course ? COURSES.find(x => x.id === C.course) : null;
+    html += `<article class="gap ${cl === "p1" ? "p1" : ""}">
+      <div class="hd"><h3>${C.t}</h3><span class="sev ${cl}">${lab}</span></div>
+      ${v.txt ? `<div class="meter"><div class="track"><i style="width:${fill}%;background:var(--${cl === "p1" ? "c-gaffe" : cl === "p2" ? "c-impr" : "win"})"></i><s style="left:50%"></s></div><span class="mono">${esc(v.txt)}</span></div>
+      <div class="note">${v.lab}${v.ok ? "" : " · échantillon trop petit pour conclure"}</div>` : `<div class="note">Pas encore de données sur ce point.</div>`}
+      <p>${C.why}</p>
+      <ul>${C.how.map(x => `<li>${x}</li>`).join("")}</ul>
+      <div class="links">
+        ${np ? `<button class="btn sm primary" data-train="${k}">${plural(np, "exercice")} tiré${np > 1 ? "s" : ""} de tes parties</button>` : ""}
+        ${course ? `<button class="btn sm" data-course="${course.id}">Cours : ${esc(course.t)}</button>` : ""}
+        ${C.links.map(l => `<a class="btn sm ghost" href="${LINK[l][1]}" target="_blank" rel="noopener">${LINK[l][0]} ↗</a>`).join("")}
+      </div>
+    </article>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll("[data-train]").forEach(b => b.addEventListener("click", () => { pz.filter = b.dataset.train; pz.key = null; setTab("train", "puz"); }));
+  el.querySelectorAll("[data-course]").forEach(b => b.addEventListener("click", () => { crs.open = b.dataset.course; crs.lesson = null; setTab("train", "course"); }));
+  const gr = $("#goRev"); if (gr) gr.onclick = () => { setTab("train", "rep"); startReview(); };
+  const cp = $("#btnCoachPlan"); if (cp) cp.addEventListener("click", () => coachPlan(d, cp));
+}
+async function coachPlan(d, btn){
+  const out = $("#coachPlan"); if (!state.sample) return;
+  btn.disabled = true; out.textContent = "Le coach prépare ton plan…";
+  const s = computeStats();
+  const lines = Object.keys(CATS).map(k => `- ${CATS[k].t} : ${d.cat[k].txt || "pas de données"} (repère ${CATS[k].ratio ? "×" + CATS[k].bench : CATS[k].pct ? Math.round(CATS[k].bench * 100) + " %" : CATS[k].bench + " par partie"})${d.cat[k].ok ? "" : " [échantillon faible]"}`).join("\n");
+  const ops = Object.values(s.openings).filter(o => o.n >= 3).sort((a, b) => b.n - a.n).slice(0, 6).map(o => `${o.name} (${o.col === "w" ? "Blancs" : "Noirs"}) : ${o.n} parties, score ${Math.round(o.pts / o.n * 100)} %`).join("\n");
+  const elo = Object.entries(s.tcs).map(([t, a]) => `${t} : ${a[a.length - 1].elo}`).join(", ");
+  const prompt = `Tu es un entraîneur d'échecs. Réponds en français, de façon chaleureuse et très concrète, en 180 mots maximum, sans titres markdown (tirets autorisés).
+
+Profil du joueur (${d.n} parties analysées par Stockfish) :
+Elo actuels : ${elo || "inconnus"}
+Bilan : ${s.W} victoires, ${s.D} nulles, ${s.L} défaites.
+Lacunes mesurées :
+${lines}
+Ouvertures les plus jouées :
+${ops || "pas assez de données"}
+
+Donne : 1) ton diagnostic en 2 phrases, 2) un plan sur 4 semaines (une ligne par semaine, avec durée quotidienne), 3) un conseil d'ouverture précis basé sur ses scores. Ne cite pas de liens.`;
+  try{ const r = await state.sample(prompt, {onText: u => { out.textContent = u.text; }}); out.textContent = r.text; }
+  catch(e){ out.textContent = e && e.code === "rate_limited" ? "Le coach est très sollicité, réessaie dans une minute." : "Le coach n'est pas disponible pour le moment."; }
+  finally{ btn.disabled = false; }
+}
+
+/* ================= S'entraîner : exercices tirés des parties ================= */
+function allPuzzles(){
+  const out = [];
+  for (const g of state.games){
+    if (!g.analysis || g.temp) continue;
+    const {fens, moves} = replay(g), A = g.analysis;
+    const cols = g.example ? ["w", "b"] : (myColor(g) ? [myColor(g)] : []);
+    for (const col of cols) for (const f of moveFacts(g, col)){
+      if (!(f.bad || f.mateMiss) || !A.best[f.i]) continue;
+      out.push({key: g.id + ":" + f.i, g, i: f.i, fen: fens[f.i], best: A.best[f.i], played: moves[f.i], cls: f.cls, evBest: A.ev[f.i], example: g.example, cats: catsOf(f)});
+    }
+  }
+  return out;
+}
+let _pzCache = null;
+const realPuzzles = () => (_pzCache || (_pzCache = allPuzzles())).filter(z => !z.example);
+const allPuzzlesC = () => _pzCache || (_pzCache = allPuzzles());
+const TRF = [["all", "Tout"], ["hang", "Pièces en prise"], ["missed", "Occasions manquées"], ["mate", "Mats"], ["opening", "Ouverture"], ["middle", "Milieu"], ["endgame", "Finale"], ["time", "Zeitnot"]];
+const pz = {idx: 0, key: null, done: false, msg: "", msgCls: "", fen: null, last: null, arrows: [], busy: false, list: [], filter: "all", hint: null};
+const pzTap = tapper(() => pz.fen, () => !pz.done && !pz.busy, mv => pzMove(mv), () => drawPz());
+function renderPuz(){
+  const el = $("#trPuz");
+  const real = realPuzzles(), base = real.length ? real : allPuzzlesC();
+  const counts = {}; for (const [k] of TRF) counts[k] = k === "all" ? base.length : base.filter(z => z.cats.includes(k)).length;
+  if (!counts[pz.filter]) pz.filter = "all";
+  pz.list = pz.filter === "all" ? base : base.filter(z => z.cats.includes(pz.filter));
+  if (!pz.list.length){
+    el.innerHTML = `<div class="empty"><div class="big">♝</div><h3 style="color:var(--fg);margin:6px 0">Pas encore d'exercices</h3><p style="max-width:54ch;margin:0 auto">Chaque erreur trouvée par l'analyse devient un exercice : tu retrouves la position et tu dois trouver le bon coup. Analyse tes parties (ou l'exemple) pour commencer.</p><p style="margin-top:12px"><button class="btn primary" id="goAn">Aller aux parties</button></p></div>`;
+    $("#goAn").onclick = () => setTab("games"); return;
+  }
+  const at = pz.key ? pz.list.findIndex(z => z.key === pz.key) : -1;
+  if (at >= 0) pz.idx = at;
+  else { const f = pz.list.findIndex(z => !state.solved[z.key]); pz.idx = f >= 0 ? f : 0; loadPz(); }
+  const z = pz.list[pz.idx], solvedN = pz.list.filter(p => state.solved[p.key]).length;
+  const opp = z.played.color === "w" ? z.g.black : z.g.white;
+  el.innerHTML = `<div class="stack">
+    <div class="filters" id="pzF">${TRF.filter(([k]) => counts[k]).map(([k, l]) => `<button aria-pressed="${k === pz.filter}" data-k="${k}">${l} <span class="mono">${counts[k]}</span></button>`).join("")}</div>
+    <div class="tr-grid"><div class="board" id="pzBoard"></div>
+    <div class="stack" style="min-width:0">
+      <div><div class="eyebrow">Exercice ${pz.idx + 1} sur ${pz.list.length} · ${solvedN} réussi${solvedN > 1 ? "s" : ""}${z.example ? " · tiré de l'exemple" : ""}</div>
+      <h2 style="margin-top:4px">Trait aux ${turnOf(z.fen) === "w" ? "Blancs" : "Noirs"} : trouve le meilleur coup</h2></div>
+      <div class="note">${z.example ? "Dans cette partie" : "Dans ta partie"} contre ${esc(opp)}${z.g.date ? " du " + fmtDate(z.g.date) : ""}, le coup joué ici était ${z.cats.includes("mate") ? "un mat manqué" : "une " + CLS[z.cls][0].toLowerCase()}. Touche une pièce puis sa case d'arrivée.</div>
+      <div class="fb ${pz.msgCls}" role="status">${esc(pz.msg) || "À toi de jouer."}</div>
+      <div class="row">
+        <button class="btn" id="pzHint" ${pz.done ? "disabled" : ""}>Indice</button>
+        <button class="btn" id="pzSol" ${pz.done ? "disabled" : ""}>Solution</button>
+        <button class="btn ghost" id="pzOpen">Voir dans la partie</button>
+        <button class="btn primary" id="pzNext">Exercice suivant</button>
+      </div>
+    </div></div></div>`;
+  drawPz();
+  $("#pzF").addEventListener("click", e => { const b = e.target.closest("button[data-k]"); if (b){ pz.filter = b.dataset.k; pz.key = null; renderPuz(); } });
+  $("#pzBoard").addEventListener("click", e => { const b = e.target.closest("[data-sq]"); if (b) pzTap.tap(b.dataset.sq); });
+  $("#pzHint").onclick = () => { const p = new Chess(z.fen).get(z.best.slice(0, 2)); pzTap.clear(); pz.hint = z.best.slice(0, 2); pz.msg = `Indice : joue ${p ? {k:"le roi", q:"la dame", r:"une tour", b:"un fou", n:"un cavalier", p:"un pion"}[p.type] : "une pièce"} (case surlignée).`; pz.msgCls = ""; renderPuz(); };
+  $("#pzSol").onclick = () => { pz.done = true; pz.arrows = [{uci: z.best, color: "var(--c-best)"}]; pz.msg = `Solution : ${frSan(uciToSan(z.fen, z.best))}. Dans la partie, ${frSan(z.played.san)} a été joué.`; pz.msgCls = "no"; renderPuz(); };
+  $("#pzOpen").onclick = () => showGame(z.g, z.i);
+  $("#pzNext").onclick = () => { pz.idx = (pz.idx + 1) % pz.list.length; loadPz(); renderPuz(); };
+}
+function loadPz(){ const z = pz.list[pz.idx]; pz.key = z.key; pz.fen = z.fen; pzTap.clear(); pz.done = false; pz.msg = ""; pz.msgCls = ""; pz.last = null; pz.arrows = []; pz.hint = null; }
+function drawPz(){ const z = pz.list[pz.idx]; drawBoard($("#pzBoard"), pz.fen, {flip: turnOf(z.fen) === "b", sel: pzTap.sel || pz.hint, targets: pzTap.targets(), last: pz.last, arrows: pz.arrows}); }
+function pzSolved(z, msg){ state.solved[z.key] = true; ls.set("ce.solved", state.solved); pz.done = true; pz.msg = msg; pz.msgCls = "ok"; renderPuz(); updateBadges(); }
+async function pzMove(mv){
+  const z = pz.list[pz.idx], c = new Chess(pz.fen);
+  c.move({from: mv.from, to: mv.to, promotion: "q"});
+  pz.last = {from: mv.from, to: mv.to}; pz.hint = null; pz.fen = c.fen();
+  if (mv.from + mv.to === z.best.slice(0, 4)) return pzSolved(z, `Bravo ! ${frSan(mv.san)} est le meilleur coup.`);
+  if (c.in_checkmate()) return pzSolved(z, `Bravo ! ${frSan(mv.san)} est mat.`);
+  pz.busy = true; pz.msg = "Vérification avec le moteur…"; pz.msgCls = ""; renderPuz();
+  let good = false;
+  try{ if (!engineBusy){ await Engine.init(); const r = await Engine.analyse(c.fen(), 11); const s = turnOf(z.fen) === "w" ? 1 : -1; good = winP(s * z.evBest) - winP(s * r.cp) <= 4; } }catch(e){}
+  pz.busy = false;
+  if (good){ pz.arrows = [{uci: z.best, color: "var(--c-best)"}]; return pzSolved(z, `Très bien ! ${frSan(mv.san)} vaut le coup du moteur (${frSan(uciToSan(z.fen, z.best))}).`); }
+  pz.msg = `${frSan(mv.san)} n'est pas le bon coup. Réessaie !`; pz.msgCls = "no"; pz.fen = z.fen; pz.last = null; renderPuz();
+}
+
+/* ================= S'entraîner : répertoire ================= */
+const TEMPLATES = [
+  {name: "Italienne et réponses de base", color: "w", lines: [
+    "e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O O-O",
+    "e4 e5 Nf3 Nc6 Bc4 Nf6 d3 Be7 O-O O-O",
+    "e4 e5 Nf3 d6 d4 exd4 Nxd4 Nf6 Nc3",
+    "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3",
+    "e4 c5 Nf3 Nc6 d4 cxd4 Nxd4",
+    "e4 e6 d4 d5 Nc3",
+    "e4 c6 d4 d5 Nc3 dxe4 Nxe4",
+    "e4 d5 exd5 Qxd5 Nc3 Qa5 d4"]},
+  {name: "Caro-Kann contre 1.e4", color: "b", lines: [
+    "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6",
+    "e4 c6 d4 d5 e5 Bf5 Nf3 e6",
+    "e4 c6 d4 d5 exd5 cxd5 Bd3 Nc6 c3 Nf6",
+    "e4 c6 Nf3 d5 Nc3 Bg4",
+    "e4 c6 Nc3 d5 Nf3 Bg4"]},
+  {name: "Gambit Dame refusé contre 1.d4", color: "b", lines: [
+    "d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 h6",
+    "d4 d5 c4 e6 Nf3 Nf6 Nc3 Be7",
+    "d4 d5 Nf3 Nf6 c4 e6",
+    "d4 d5 Bf4 Nf6 e3 c5",
+    "d4 d5 c4 e6 cxd5 exd5 Nc3 Nf6"]}
+];
+function cleanLines(lines){
+  const ok = [];
+  for (const l of lines){
+    const c = new Chess(), out = [];
+    for (const san of l){ const m = c.move(san, {sloppy: true}); if (!m) break; out.push(m.san); }
+    if (out.length) ok.push(out);
+  }
+  const keys = ok.map(l => l.join(" "));
+  return ok.filter((l, i) => !keys.some((k, j) => j !== i && k.length > keys[i].length && k.startsWith(keys[i] + " ")) && keys.indexOf(keys[i]) === i);
+}
+function newRep(name, color, lines){ return {id: "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, color, lines: cleanLines(lines || []), created: Date.now()}; }
+function saveReps(){ Store.kvSet("reps", state.reps); _treeCache.clear(); }
+const _treeCache = new Map();
+function buildTree(rep){
+  const ck = rep.id + "|" + rep.lines.length + "|" + rep.lines.map(l => l.length).join(",");
+  if (_treeCache.has(ck)) return _treeCache.get(ck);
+  const T = new Map();
+  for (const line of rep.lines){
+    const c = new Chess(); let last = null;
+    for (const san of line){
+      const k = fenKey(c.fen()); let n = T.get(k);
+      if (!n){ n = {fen: c.fen(), moves: {}, last}; T.set(k, n); }
+      const m = c.move(san, {sloppy: true}); if (!m) break;
+      n.moves[m.san] = n.moves[m.san] || fenKey(c.fen());
+      last = {from: m.from, to: m.to};
+    }
+    const k = fenKey(c.fen()); if (!T.has(k)) T.set(k, {fen: c.fen(), moves: {}, last});
+  }
+  _treeCache.set(ck, T); return T;
+}
+function repCards(rep){
+  const out = [];
+  for (const [k, n] of buildTree(rep)){
+    if (turnOf(n.fen) !== rep.color) continue;
+    const ans = Object.keys(n.moves); if (!ans.length) continue;
+    out.push({key: rep.id + "|" + k, rep, fen: n.fen, ans, last: n.last, depth: +n.fen.split(" ")[5]});
+  }
+  return out.sort((a, b) => a.depth - b.depth);
+}
+const today = () => new Date().toISOString().slice(0, 10);
+function dueCards(){
+  const now = Date.now(), due = [], fresh = [];
+  for (const r of state.reps) for (const c of repCards(r)){ const s = state.srs[c.key]; if (s){ if (s.due <= now) due.push(c); } else fresh.push(c); }
+  due.sort((a, b) => state.srs[a.key].due - state.srs[b.key].due);
+  const meta = state.srsMeta.day === today() ? state.srsMeta : {day: today(), n: 0};
+  return due.concat(fresh.slice(0, Math.max(0, 10 - meta.n)));
+}
+function sm2(key, q){
+  const s = state.srs[key] || {ef: 2.5, iv: 0, reps: 0, due: 0, lapses: 0};
+  const isNew = !state.srs[key];
+  if (q < 3){ s.reps = 0; s.iv = 0; s.lapses++; s.due = Date.now() + 10 * 60000; }
+  else { s.reps++; s.iv = s.reps === 1 ? 1 : s.reps === 2 ? 3 : Math.round(s.iv * s.ef); s.due = Date.now() + s.iv * DAY; }
+  s.ef = Math.max(1.3, s.ef + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+  state.srs[key] = s;
+  if (isNew){ if (state.srsMeta.day !== today()) state.srsMeta = {day: today(), n: 0}; state.srsMeta.n++; Store.kvSet("srsMeta", state.srsMeta); }
+  Store.kvSet("srs", state.srs);
+}
+const rp = {view: "list", edit: null, line: [], fen: null, last: null, rev: null, msg: "", msgCls: ""};
+const rpTap = tapper(() => rp.fen, () => rp.view === "edit" || (rp.view === "review" && rp.rev && !rp.rev.done), mv => rpMove(mv), () => drawRp());
+function renderRep(){
+  const el = $("#trRep");
+  if (rp.view === "edit" && rp.edit) return renderRepEdit(el);
+  if (rp.view === "review") return renderReview(el);
+  const due = dueCards(), devs = deviations();
+  let html = `<div class="stack">
+    <div class="row between"><div><h2>Mon répertoire</h2><p class="note" style="margin-top:4px">Tes lignes d'ouverture, révisées en répétition espacée : chaque position revient juste avant que tu l'oublies.</p></div>
+    <button class="btn primary" id="repReview" ${due.length ? "" : "disabled"}>${due.length ? `Réviser (${due.length})` : "Rien à réviser"}</button></div>`;
+  if (state.reps.length){
+    html += `<div class="cards">${state.reps.map(r => {
+      const cards = repCards(r), d = cards.filter(c => state.srs[c.key] && state.srs[c.key].due <= Date.now()).length, learnt = cards.filter(c => state.srs[c.key] && state.srs[c.key].reps >= 2).length;
+      return `<div class="card"><div class="row between"><span class="side-tag" aria-label="${r.color === "w" ? "Blancs" : "Noirs"}">${r.color === "w" ? "♔" : "♚"}</span>${d ? `<span class="due mono">${d} à revoir</span>` : ""}</div>
+        <h3>${esc(r.name)}</h3>
+        <div class="stats"><span><b>${r.lines.length}</b> lignes</span><span><b>${cards.length}</b> positions</span><span><b>${learnt}</b> acquises</span></div>
+        <div class="pbar"><div style="width:${cards.length ? learnt / cards.length * 100 : 0}%"></div></div>
+        <div class="row"><button class="btn sm" data-edit="${r.id}">Modifier</button><button class="btn sm ghost" data-del="${r.id}">Supprimer</button></div></div>`;
+    }).join("")}</div>`;
+  } else html += `<div class="empty"><div class="big">♘</div><p style="max-width:52ch;margin:0 auto">Aucun répertoire pour l'instant. Crée le tien, ou pars d'un modèle et adapte-le.</p></div>`;
+  html += `<div class="panel stack"><h3>Créer un répertoire</h3>
+    <form class="row" id="repNew" style="align-items:flex-end">
+      <div class="field"><label for="repName">Nom</label><input id="repName" placeholder="ex. Mes ouvertures avec les Blancs" required></div>
+      <div class="field" style="flex:0 1 150px"><label for="repColor">Je joue</label><select id="repColor"><option value="w">les Blancs</option><option value="b">les Noirs</option></select></div>
+      <button class="btn primary" type="submit">Créer</button>
+    </form>
+    <div class="stack" style="gap:8px"><div class="eyebrow">Ou partir d'un modèle</div>
+    <div class="row">${TEMPLATES.map((t, i) => `<button class="btn sm" data-tpl="${i}">${t.color === "w" ? "♔" : "♚"} ${esc(t.name)}</button>`).join("")}</div></div></div>`;
+  if (devs.length){
+    html += `<div class="panel stack"><h3>Écarts dans tes parties récentes</h3><p class="note">Les parties où tu as quitté ton répertoire alors qu'il prévoyait un coup.</p>
+      <div class="tbl-wrap"><table><thead><tr><th>Partie</th><th>Joué</th><th>Prévu</th><th></th></tr></thead><tbody>
+      ${devs.slice(0, 10).map(d => `<tr><td>contre ${esc(myColor(d.g) === "w" ? d.g.black : d.g.white)}<div class="note">${fmtDate(d.g.date)}</div></td><td class="mono">${d.num} ${esc(frSan(d.played))}</td><td class="mono">${esc(d.exp.map(frSan).join(", "))}</td><td><button class="btn sm ghost" data-dev="${d.g.id}:${d.i}">Voir</button></td></tr>`).join("")}
+      </tbody></table></div></div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+  $("#repReview").onclick = startReview;
+  $("#repNew").addEventListener("submit", e => { e.preventDefault(); const r = newRep($("#repName").value.trim() || "Mon répertoire", $("#repColor").value, []); state.reps.push(r); saveReps(); openRepEdit(r); });
+  el.querySelectorAll("[data-tpl]").forEach(b => b.addEventListener("click", () => { const t = TEMPLATES[+b.dataset.tpl]; const r = newRep(t.name, t.color, t.lines.map(l => l.split(" "))); state.reps.push(r); saveReps(); renderRep(); updateBadges(); }));
+  el.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => openRepEdit(state.reps.find(r => r.id === b.dataset.edit))));
+  el.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.confirm){ state.reps = state.reps.filter(r => r.id !== b.dataset.del); saveReps(); renderRep(); updateBadges(); return; }
+    b.dataset.confirm = "1"; b.textContent = "Confirmer la suppression"; b.classList.remove("ghost");
+  }));
+  el.querySelectorAll("[data-dev]").forEach(b => b.addEventListener("click", () => { const [id, i] = b.dataset.dev.split(":"); openGame(id, +i + 1); }));
+}
+function deviations(){
+  if (!state.reps.length) return [];
+  const out = [];
+  for (const g of realGames().slice(0, 60)){
+    const col = myColor(g); if (!col) continue;
+    const {fens, moves} = replay(g);
+    if (headers(g.pgn).FEN) continue;
+    for (const rep of state.reps.filter(r => r.color === col)){
+      const T = buildTree(rep); let hit = null;
+      for (let i = 0; i < moves.length; i++){
+        const n = T.get(fenKey(fens[i])); if (!n) break;
+        const opts = Object.keys(n.moves); if (!opts.length) break;
+        if (!n.moves[moves[i].san]){ if (moves[i].color === col) hit = {g, i, rep, played: moves[i].san, exp: opts, num: fens[i].split(" ")[5] + (col === "w" ? "." : "…")}; break; }
+      }
+      if (hit){ out.push(hit); break; }
+    }
+  }
+  return out;
+}
+function openRepEdit(r){ rp.view = "edit"; rp.edit = r; rp.line = []; rp.fen = new Chess().fen(); rp.last = null; rpTap.clear(); rp.msg = ""; renderRep(); }
+function renderRepEdit(el){
+  const r = rp.edit, T = buildTree(r), node = T.get(fenKey(rp.fen)), known = node ? Object.keys(node.moves) : [];
+  el.innerHTML = `<div class="stack">
+    <div class="row between"><div><div class="eyebrow">${r.color === "w" ? "Répertoire Blancs" : "Répertoire Noirs"}</div><h2>${esc(r.name)}</h2></div><button class="btn" id="repBack">Terminé</button></div>
+    <div class="tr-grid"><div class="board" id="rpBoard"></div>
+    <div class="stack" style="min-width:0">
+      <p class="note">Joue les coups des deux camps sur l'échiquier pour construire une ligne, puis enregistre-la. Les coups déjà présents dans ton répertoire apparaissent ci-dessous.</p>
+      <div class="cur-line" id="rpLine">${rp.line.length ? esc(lineText(rp.line)) : '<span class="muted">Position de départ</span>'}</div>
+      ${known.length ? `<div class="stack" style="gap:6px"><div class="eyebrow">Suites déjà enregistrées</div><div class="known">${known.map(s => `<button data-known="${esc(s)}">${esc(frSan(s))}</button>`).join("")}</div></div>` : ""}
+      <div class="row">
+        <button class="btn" id="rpUndo" ${rp.line.length ? "" : "disabled"}>◀ Annuler</button>
+        <button class="btn" id="rpReset" ${rp.line.length ? "" : "disabled"}>Revenir au début</button>
+        <button class="btn primary" id="rpSave" ${rp.line.length ? "" : "disabled"}>Enregistrer la ligne</button>
+      </div>
+      <div class="toast" role="status">${esc(rp.msg)}</div>
+      <details class="fold"><summary>Importer des lignes en PGN (variantes acceptées)</summary>
+        <div class="stack"><textarea class="txt" id="rpPgn" placeholder="1. e4 e5 2. Nf3 Nc6 (2... d6 3. d4) 3. Bc4 *"></textarea><div class="row"><button class="btn sm" id="rpImport">Importer</button></div></div></details>
+      <div class="stack" style="gap:6px"><div class="eyebrow">${plural(r.lines.length, "ligne")}</div>
+      <div class="lines">${r.lines.map((l, i) => `<div><span>${esc(lineText(l))}</span><button data-rm="${i}" aria-label="Supprimer la ligne">✕</button></div>`).join("") || '<div><span class="muted">Aucune ligne pour l\'instant.</span></div>'}</div></div>
+    </div></div></div>`;
+  drawRp();
+  $("#repBack").onclick = () => { rp.view = "list"; renderRep(); updateBadges(); };
+  $("#rpBoard").addEventListener("click", e => { const b = e.target.closest("[data-sq]"); if (b) rpTap.tap(b.dataset.sq); });
+  el.querySelectorAll("[data-known]").forEach(b => b.addEventListener("click", () => { const c = new Chess(rp.fen); const m = c.move(b.dataset.known); if (m){ rp.line.push(m.san); rp.fen = c.fen(); rp.last = {from: m.from, to: m.to}; rp.msg = ""; renderRep(); } }));
+  $("#rpUndo").onclick = () => { rp.line.pop(); replayEdit(); };
+  $("#rpReset").onclick = () => { rp.line = []; replayEdit(); };
+  $("#rpSave").onclick = () => {
+    r.lines = cleanLines(r.lines.concat([rp.line.slice()])); saveReps();
+    rp.msg = "Ligne enregistrée."; renderRep(); updateBadges();
+  };
+  $("#rpImport").onclick = () => {
+    const lines = pgnLines($("#rpPgn").value);
+    const before = r.lines.length; r.lines = cleanLines(r.lines.concat(lines)); saveReps();
+    rp.msg = lines.length ? `${plural(lines.length, "ligne")} lue${lines.length > 1 ? "s" : ""}, ${r.lines.length - before >= 0 ? r.lines.length - before : 0} nouvelle(s) dans le répertoire.` : "Aucun coup valide trouvé dans ce texte.";
+    renderRep(); updateBadges();
+  };
+  el.querySelectorAll("[data-rm]").forEach(b => b.addEventListener("click", () => { r.lines.splice(+b.dataset.rm, 1); saveReps(); renderRep(); updateBadges(); }));
+}
+function replayEdit(){ const c = new Chess(); let last = null; for (const s of rp.line){ const m = c.move(s); last = {from: m.from, to: m.to}; } rp.fen = c.fen(); rp.last = last; rpTap.clear(); rp.msg = ""; renderRep(); }
+function pgnLines(text){
+  const out = [];
+  for (const chunk of (splitPgn(text).length ? splitPgn(text) : [text])){
+    const body = chunk.replace(/\[[^\]]*\]/g, " ").replace(/\{[^}]*\}/g, " ").replace(/;[^\n]*/g, " ").replace(/\$\d+/g, " ");
+    const toks = body.match(/\(|\)|[^\s()]+/g) || [];
+    let cur = [], stack = [];
+    for (let t of toks){
+      if (t === "("){ stack.push(cur.slice()); cur = cur.slice(0, -1); continue; }
+      if (t === ")"){ out.push(cur); cur = stack.pop() || []; continue; }
+      if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)) continue;
+      t = t.replace(/^\d+\.+/, "").replace(/[!?+#]+$/, "");
+      if (!t || /^\d+$/.test(t)) continue;
+      cur.push(t);
+    }
+    out.push(cur);
+  }
+  return cleanLines(out.filter(l => l.length));
+}
+function drawRp(){
+  const b = $("#rpBoard"); if (!b) return;
+  const flip = rp.view === "edit" ? rp.edit.color === "b" : rp.rev && rp.rev.card.rep.color === "b";
+  const arrows = rp.view === "review" && rp.rev && rp.rev.show ? rp.rev.card.ans.map(s => { const m = new Chess(rp.rev.card.fen).move(s); return m ? {uci: m.from + m.to, color: "var(--c-best)"} : null; }) : [];
+  drawBoard(b, rp.fen, {flip, last: rp.last, sel: rpTap.sel, targets: rpTap.targets(), arrows});
+}
+function startReview(){
+  const q = dueCards();
+  if (!q.length){ rp.view = "list"; renderRep(); return; }
+  rp.view = "review"; rp.queue = q; rp.done = 0; nextCard();
+}
+function nextCard(){
+  const card = rp.queue.shift();
+  if (!card){ rp.view = "list"; rp.rev = null; rp.msg = ""; renderRep(); updateBadges(); return; }
+  const isNew = !state.srs[card.key];
+  rp.rev = {card, tries: 0, done: false, show: isNew, isNew};
+  rp.fen = card.fen; rp.last = card.last; rpTap.clear();
+  rp.msg = isNew ? `Nouvelle position : joue ${card.ans.length > 1 ? "l'un des coups indiqués" : "le coup indiqué"} pour le mémoriser.` : "Quel coup joues-tu ici ?"; rp.msgCls = "";
+  renderRep();
+}
+function renderReview(el){
+  const R = rp.rev; if (!R) return;
+  const left = rp.queue.length + (R.done ? 0 : 1);
+  el.innerHTML = `<div class="stack">
+    <div class="row between"><div><div class="eyebrow">Révision · ${plural(left, "position")} restante${left > 1 ? "s" : ""}</div><h2>${esc(R.card.rep.name)}</h2></div><button class="btn" id="revStop">Arrêter</button></div>
+    <div class="tr-grid"><div class="board" id="rpBoard"></div>
+    <div class="stack" style="min-width:0">
+      <div class="note">Trait aux ${turnOf(R.card.fen) === "w" ? "Blancs" : "Noirs"}, coup ${R.card.fen.split(" ")[5]}.</div>
+      <div class="fb ${rp.msgCls}" role="status">${esc(rp.msg)}</div>
+      <div class="row">${R.done ? `<button class="btn primary" id="revNext">Position suivante</button>` : `<button class="btn" id="revShow">Je ne sais plus</button>`}</div>
+    </div></div></div>`;
+  drawRp();
+  $("#revStop").onclick = () => { rp.view = "list"; rp.rev = null; renderRep(); updateBadges(); };
+  $("#rpBoard").addEventListener("click", e => { const b = e.target.closest("[data-sq]"); if (b) rpTap.tap(b.dataset.sq); });
+  const nx = $("#revNext"); if (nx) nx.onclick = nextCard;
+  const sh = $("#revShow"); if (sh) sh.onclick = () => { R.show = true; R.tries = 2; rp.msg = `Ta ligne : ${R.card.ans.map(frSan).join(" ou ")}. Joue-le pour continuer.`; rp.msgCls = "no"; renderRep(); };
+}
+function rpMove(mv){
+  if (rp.view === "edit"){
+    const c = new Chess(rp.fen), m = c.move({from: mv.from, to: mv.to, promotion: "q"});
+    if (!m) return;
+    rp.line.push(m.san); rp.fen = c.fen(); rp.last = {from: m.from, to: m.to}; rp.msg = ""; renderRep(); return;
+  }
+  const R = rp.rev; if (!R || R.done) return;
+  const c = new Chess(R.card.fen), m = c.move({from: mv.from, to: mv.to, promotion: "q"});
+  if (!m) return;
+  if (R.card.ans.includes(m.san)){
+    const q = R.isNew ? 4 : R.tries === 0 ? 5 : R.tries === 1 ? 3 : 1;
+    sm2(R.card.key, q); R.done = true; rp.fen = c.fen(); rp.last = {from: m.from, to: m.to}; R.show = false;
+    rp.msg = q >= 4 ? `Exact : ${frSan(m.san)}.` : q === 3 ? `C'est ça : ${frSan(m.san)}. Elle reviendra un peu plus tôt.` : `Noté : cette position reviendra dans 10 minutes.`;
+    rp.msgCls = q >= 3 ? "ok" : "no";
+    if (q < 3) rp.queue.push(R.card);
+    renderRep(); updateBadges();
+    if (q >= 4) setTimeout(() => { if (rp.rev === R) nextCard(); }, 900);
+  } else {
+    R.tries++;
+    if (R.tries >= 2){ R.show = true; rp.msg = `Ce n'est pas ta ligne. Prévu : ${R.card.ans.map(frSan).join(" ou ")}. Joue-le pour continuer.`; }
+    else rp.msg = `${frSan(m.san)} n'est pas dans ton répertoire. Réessaie.`;
+    rp.msgCls = "no"; renderRep();
+  }
+}
+
+/* ================= S'entraîner : cours ================= */
+/* steps : coups attendus de l'élève (index pairs, alternatives séparées par |) et réponses adverses (index impairs). */
+const COURSES = [
+  {id: "mats", t: "Les mats de base", d: "Les motifs qui reviennent dans toutes les parties.", lessons: [
+    {id: "couloir", t: "Le mat du couloir", fen: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1", steps: ["d1d8"], mate: true,
+      intro: "Le roi noir a roqué et ses trois pions le protègent… mais l'enferment aussi. Sa dernière rangée n'est pas défendue.",
+      end: "Td8# : le roi ne peut pas avancer à cause de ses propres pions. Pense toujours à laisser une case de fuite à ton roi (h3 ou g3 par exemple)."},
+    {id: "h7", t: "Dame et fou sur h7", fen: "r4rk1/pp3pp1/8/7Q/8/3B4/PPP2PPP/R5K1 w - - 0 1", steps: ["h5h7"], mate: true,
+      intro: "Ta dame est en h5 et ton fou vise h7 depuis d3. Le roi roqué n'a plus de pion en h7 pour le protéger.",
+      end: "Dh7# : la dame est protégée par le fou, et la tour f8 bloque la fuite du roi. Ce duo dame + fou sur la diagonale b1-h7 est un classique."},
+    {id: "etouffee", t: "Le mat à l'étouffée", fen: "6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1", steps: ["g5f7"], mate: true,
+      intro: "Le roi noir est entouré de ses propres pièces. Seul un cavalier peut l'atteindre par-dessus elles.",
+      end: "Cf7# : le roi est « étouffé » par sa tour et ses pions. Quand un roi n'a aucune case libre, cherche un échec de cavalier."},
+    {id: "escalier", t: "L'échelle avec deux tours", fen: "7k/R7/8/8/8/8/8/1R4K1 w - - 0 1", steps: ["b1b8"], mate: true,
+      intro: "Ta tour a7 contrôle la 7e rangée. La deuxième tour peut donner le coup final.",
+      end: "Tb8# : une tour coupe la 7e rangée, l'autre donne échec sur la 8e. Avec deux tours, on repousse le roi rangée par rangée jusqu'au bord."}
+  ]},
+  {id: "tactique", t: "Tactiques essentielles", d: "Les quatre motifs qui gagnent du matériel.", lessons: [
+    {id: "fourchette", t: "La fourchette de cavalier", fen: "6k1/3q1p1p/6p1/8/4N3/8/5PPP/6K1 w - - 0 1", steps: ["e4f6", "g8g7", "f6d7"],
+      intro: "Le cavalier peut attaquer deux pièces à la fois. Cherche une case d'où il donne échec au roi tout en attaquant la dame.",
+      end: "Cf6+ attaque le roi et la dame en même temps. Le roi doit bouger, et Cxd7 gagne la dame."},
+    {id: "clouage", t: "Exploiter un clouage", fen: "4k3/8/2n5/1B6/3P4/8/8/4K3 w - - 0 1", steps: ["d4d5"],
+      intro: "Le cavalier c6 est cloué : s'il bouge, ton fou b5 donne échec au roi e8. Une pièce clouée est une cible idéale.",
+      end: "d5 ! Le pion attaque le cavalier, qui ne peut pas s'enfuir. Il est perdu au coup suivant. Attaque toujours une pièce clouée avec une pièce de moindre valeur."},
+    {id: "enfilade", t: "L'enfilade", fen: "2r5/8/4k3/8/8/8/8/4KB2 w - - 0 1", steps: ["f1h3", "e6e5", "h3c8"],
+      intro: "Le roi noir et la tour c8 sont sur la même diagonale. Si tu donnes échec au roi sur cette diagonale, il devra s'écarter…",
+      end: "Fh3+ ! Le roi s'écarte et la tour derrière lui tombe : Fxc8. C'est l'enfilade, l'inverse du clouage."},
+    {id: "decouverte", t: "L'échec double", fen: "4k3/1q6/8/8/4N3/8/5PPP/4R1K1 w - - 0 1", steps: ["e4d6", "e8d8", "d6b7"],
+      intro: "Ton cavalier e4 masque ta tour e1. Quand il bouge, la tour donne échec. Trouve la case où le cavalier donne aussi échec en attaquant la dame.",
+      end: "Cd6++ est un échec double : la tour et le cavalier donnent échec ensemble. Le roi doit bouger, puis Cxb7 gagne la dame."}
+  ]},
+  {id: "finales", t: "Finales à connaître", d: "Trois positions que tout joueur doit savoir jouer.", lessons: [
+    {id: "carre", t: "La règle du carré", fen: "8/8/7k/8/P7/8/8/6K1 w - - 0 1", steps: ["a4a5"],
+      intro: "Peux-tu promouvoir ton pion avant que le roi noir ne le rattrape ? Trace le carré entre le pion et sa case de promotion : si le roi ne peut pas y entrer, le pion passe.",
+      end: "a5 ! Après ce coup, le carré du pion va de a5 à d8. Le roi en h6 ne peut pas y entrer en un coup : le pion fera dame."},
+    {id: "philidor", t: "La défense Philidor", fen: "4k3/R7/8/3KP3/8/8/8/1r6 b - - 0 1", steps: ["b1b6", "e5e6", "b6b1"],
+      intro: "Tu as les Noirs, avec une tour contre tour et pion. Le roi blanc veut avancer en 6e rangée. Place ta tour pour l'en empêcher.",
+      end: "Tb6 ! tient la 6e rangée. Dès que le pion avance en e6, le roi blanc perd son abri : la tour retourne en b1 pour donner des échecs par derrière. C'est nulle."},
+    {id: "lucena", t: "La position de Lucena", fen: "1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1", steps: ["c1d1", "d8e7", "d1d4", "a2a1", "b8c7", "a1c1", "c7b6", "c1b1", "b6c6", "b1c1", "c6b5", "c1b1", "d4b4"],
+      intro: "Ton roi est bloqué devant son pion. Il faut d'abord éloigner le roi noir, puis « construire un pont » avec ta tour pour abriter ton roi des échecs.",
+      end: "Td1+ éloigne le roi, Td4 prépare le pont, puis le roi sort et Tb4 bloque les échecs. Le pion va faire dame : c'est la méthode gagnante de base en finale de tours."}
+  ]},
+  {id: "ouv", t: "Bien commencer la partie", d: "Les principes qui évitent les mauvaises ouvertures.", lessons: [
+    {id: "centre", t: "Prends le centre", start: "", steps: ["e2e4|d2d4"],
+      intro: "Le centre (e4, d4, e5, d5) est la zone la plus importante : une pièce centrale contrôle plus de cases. Joue un premier coup qui occupe le centre.",
+      end: "Les coups de pion centraux libèrent aussi tes fous et ta dame. e4 et d4 sont les deux premiers coups les plus joués."},
+    {id: "dev", t: "Développe tes pièces", start: "e4 e5", steps: ["g1f3|b1c3|f1c4|f1b5"],
+      intro: "Après 1.e4 e5, sors une pièce mineure (cavalier ou fou) vers le centre, de préférence en créant une menace.",
+      end: "Cf3 est idéal : il développe une pièce et attaque le pion e5. Développe les cavaliers avant les fous, et ne joue pas deux fois la même pièce sans raison."},
+    {id: "roque", t: "Roque tôt", start: "e4 e5 Nf3 Nc6 Bc4 Bc5", steps: ["e1g1"],
+      intro: "Tes pièces mineures côté roi sont sorties. Mets ton roi en sécurité et active ta tour en un seul coup.",
+      end: "O-O met le roi à l'abri derrière ses pions et rapproche la tour du centre. En général, roque avant le 10e coup."},
+    {id: "f7", t: "Défends-toi contre le coup du berger", start: "e4 e5 Bc4 Nc6 Qh5", steps: ["g7g6|d8e7|d8f6"],
+      intro: "Tu as les Noirs. La dame et le fou blancs visent f7, défendu seulement par ton roi. Attention : 3…Cf6 ?? perdrait sur Dxf7#.",
+      end: "…g6 chasse la dame tout en bloquant la menace (…De7 et …Df6 défendent aussi f7). Ensuite, ta dame adverse sortie trop tôt sera une cible pour ton développement."}
+  ]}
+];
+const crs = {open: null, lesson: null, step: 0, fen: null, last: null, msg: "", msgCls: "", done: false, hint: null, arrows: []};
+const crTap = tapper(() => crs.fen, () => !!crs.lesson && !crs.done && crs.step % 2 === 0, mv => crMove(mv), () => drawCr());
+function lessonById(id){ for (const c of COURSES) for (const l of c.lessons) if (l.id === id) return {course: c, lesson: l}; return null; }
+function lessonStartFen(l){ if (l.fen) return l.fen; const c = new Chess(); for (const s of (l.start || "").split(" ").filter(Boolean)) c.move(s); return c.fen(); }
+function renderCourse(){
+  const el = $("#trCourse");
+  if (crs.lesson) return renderLesson(el);
+  const total = COURSES.reduce((a, c) => a + c.lessons.length, 0), done = Object.keys(state.course).filter(k => state.course[k]).length;
+  el.innerHTML = `<div class="stack">
+    <div><h2>Cours</h2><p class="note" style="margin-top:4px">${done}/${total} leçons terminées. Chaque leçon se joue sur l'échiquier : lis l'idée, puis trouve les coups.</p></div>
+    ${COURSES.map(c => { const n = c.lessons.filter(l => state.course[l.id]).length; return `<div class="course" id="course-${c.id}">
+      <div class="row between"><div><h3>${esc(c.t)}</h3><div class="note">${esc(c.d)}</div></div><span class="mono muted">${n}/${c.lessons.length}</span></div>
+      <div class="lessons">${c.lessons.map((l, i) => `<button data-lesson="${l.id}"><span class="num ${state.course[l.id] ? "done" : ""}">${state.course[l.id] ? "✓" : i + 1}</span><span>${esc(l.t)}</span><span class="muted">›</span></button>`).join("")}</div></div>`; }).join("")}
+    <div class="panel stack"><h3>Aller plus loin</h3><div class="links">${["practice", "lessons", "themes"].map(l => `<a class="btn sm ghost" href="${LINK[l][1]}" target="_blank" rel="noopener">${LINK[l][0]} ↗</a>`).join("")}</div></div>
+  </div>`;
+  el.querySelectorAll("[data-lesson]").forEach(b => b.addEventListener("click", () => startLesson(b.dataset.lesson)));
+  if (crs.open){ const t = $("#course-" + crs.open); if (t) t.scrollIntoView({block: "start"}); crs.open = null; }
+}
+function startLesson(id){ const L = lessonById(id); if (!L) return; crs.lesson = L.lesson; crs.course = L.course; crs.step = 0; crs.fen = lessonStartFen(L.lesson); crs.side = turnOf(crs.fen); crs.last = null; crs.done = false; crs.msg = ""; crs.msgCls = ""; crs.hint = null; crs.arrows = []; crTap.clear(); renderCourse(); }
+function renderLesson(el){
+  const l = crs.lesson, c = crs.course, idx = c.lessons.indexOf(l), next = c.lessons[idx + 1];
+  const userSteps = Math.ceil(l.steps.length / 2), doneSteps = Math.floor(crs.step / 2) + (crs.done ? 0 : 0);
+  el.innerHTML = `<div class="stack">
+    <div class="row between"><div><div class="eyebrow">${esc(c.t)} · leçon ${idx + 1}/${c.lessons.length}</div><h2>${esc(l.t)}</h2></div><button class="btn" id="crBack">Tous les cours</button></div>
+    <div class="tr-grid"><div class="board" id="crBoard"></div>
+    <div class="stack" style="min-width:0">
+      <div class="lesson-body"><p>${l.intro}</p></div>
+      <div class="note">Trait aux ${crs.side === "w" ? "Blancs" : "Noirs"}${userSteps > 1 ? ` · coup ${Math.min(userSteps, doneSteps + 1)}/${userSteps}` : ""}${l.mate ? " · trouve le mat en 1" : ""}.</div>
+      <div class="fb ${crs.msgCls}" role="status">${crs.done ? "" : esc(crs.msg) || "À toi de jouer."}${crs.done ? `<span>${esc(l.end)}</span>` : ""}</div>
+      <div class="row">
+        ${crs.done ? (next ? `<button class="btn primary" id="crNext">Leçon suivante</button>` : `<button class="btn primary" id="crBack2">Terminer le parcours</button>`) : `<button class="btn" id="crHint">Indice</button><button class="btn" id="crSol">Solution</button>`}
+        <button class="btn ghost" id="crRestart">Recommencer</button>
+      </div>
+    </div></div></div>`;
+  drawCr();
+  $("#crBack").onclick = () => { crs.lesson = null; crs.open = c.id; renderCourse(); };
+  $("#crBoard").addEventListener("click", e => { const b = e.target.closest("[data-sq]"); if (b) crTap.tap(b.dataset.sq); });
+  $("#crRestart").onclick = () => startLesson(l.id);
+  const nx = $("#crNext"); if (nx) nx.onclick = () => startLesson(next.id);
+  const b2 = $("#crBack2"); if (b2) b2.onclick = () => { crs.lesson = null; renderCourse(); };
+  const h = $("#crHint"); if (h) h.onclick = () => { crs.hint = l.steps[crs.step].split("|")[0].slice(0, 2); crs.msg = "Indice : la pièce à jouer est surlignée."; crs.msgCls = ""; renderCourse(); };
+  const s = $("#crSol"); if (s) s.onclick = () => { const u = l.steps[crs.step].split("|")[0]; crs.arrows = [{uci: u, color: "var(--c-best)"}]; crs.msg = `Solution : ${frSan(uciToSan(crs.fen, u))}. Joue-le pour continuer.`; crs.msgCls = "no"; renderCourse(); };
+}
+function drawCr(){ const b = $("#crBoard"); if (b) drawBoard(b, crs.fen, {flip: crs.side === "b", last: crs.last, sel: crTap.sel || crs.hint, targets: crTap.targets(), arrows: crs.arrows}); }
+function crMove(mv){
+  const l = crs.lesson, exp = l.steps[crs.step].split("|"), c = new Chess(crs.fen);
+  const m = c.move({from: mv.from, to: mv.to, promotion: "q"}); if (!m) return;
+  const uci = mv.from + mv.to, ok = exp.some(e => e.slice(0, 4) === uci) || (l.mate && c.in_checkmate());
+  if (!ok){ crs.msg = `${frSan(m.san)} n'est pas le coup recherché. Réessaie !`; crs.msgCls = "no"; renderCourse(); return; }
+  crs.fen = c.fen(); crs.last = {from: m.from, to: m.to}; crs.hint = null; crs.arrows = []; crs.step++;
+  if (crs.step >= l.steps.length){ crs.done = true; crs.msgCls = "ok"; state.course[l.id] = true; Store.kvSet("course", state.course); renderCourse(); return; }
+  crs.msg = `Bien joué : ${frSan(m.san)}.`; crs.msgCls = "ok"; renderCourse();
+  setTimeout(() => {
+    const r = l.steps[crs.step], c2 = new Chess(crs.fen), m2 = c2.move({from: r.slice(0, 2), to: r.slice(2, 4), promotion: r[4] || "q"});
+    if (!m2) return;
+    crs.fen = c2.fen(); crs.last = {from: m2.from, to: m2.to}; crs.step++;
+    crs.msg = `L'adversaire répond ${frSan(m2.san)}. À toi.`; crs.msgCls = "";
+    if (crs.step >= l.steps.length){ crs.done = true; crs.msgCls = "ok"; state.course[l.id] = true; Store.kvSet("course", state.course); }
+    renderCourse();
+  }, 650);
+}
+
+/* ================= Jouer contre Stockfish ================= */
+const LEVELS = [
+  {n: "1 · Débutant", skill: 0, depth: 1, mt: 150}, {n: "2", skill: 3, depth: 2, mt: 200}, {n: "3", skill: 6, depth: 4, mt: 300},
+  {n: "4 · Club", skill: 9, depth: 6, mt: 400}, {n: "5", skill: 12, depth: 8, mt: 500}, {n: "6", skill: 15, depth: 10, mt: 700},
+  {n: "7 · Fort", skill: 18, depth: 12, mt: 900}, {n: "8 · Maximum", skill: 20, depth: 15, mt: 1200}];
+const pl = {c: null, color: "w", level: ls.get("ce.level", 3), last: null, thinking: false, msg: "", startFen: null};
+const plTap = tapper(() => pl.c.fen(), () => !pl.thinking && !pl.c.game_over() && pl.c.turn() === pl.color, mv => plMove(mv), () => drawPl());
+function newPlay(o){
+  o = o || {};
+  pl.startFen = o.fen || new Chess().fen();
+  pl.c = new Chess(pl.startFen);
+  pl.color = o.color || (o.random ? (Math.random() < .5 ? "w" : "b") : pl.color);
+  pl.last = null; pl.msg = ""; plTap.clear();
+  if (state.tab === "play") renderPlay();
+  if (pl.c.turn() !== pl.color) engineReply();
+}
+function playStatus(){
+  const c = pl.c;
+  if (c.in_checkmate()) return c.turn() === pl.color ? "Échec et mat : Stockfish gagne." : "Échec et mat : tu as gagné !";
+  if (c.in_stalemate()) return "Pat : partie nulle.";
+  if (c.in_threefold_repetition()) return "Nulle par triple répétition.";
+  if (c.insufficient_material()) return "Nulle : matériel insuffisant.";
+  if (c.in_draw()) return "Partie nulle (règle des 50 coups).";
+  if (pl.thinking) return "Stockfish réfléchit…";
+  return pl.msg || (c.turn() === pl.color ? "À toi de jouer." + (c.in_check() ? " Tu es en échec !" : "") : "");
+}
+function renderPlay(){
+  if (!pl.c) newPlay();
+  const el = $("#sec-play"), over = pl.c.game_over();
+  const hist = pl.c.history(), startPly = (+pl.startFen.split(" ")[5] - 1) * 2 + (turnOf(pl.startFen) === "b" ? 1 : 0);
+  el.innerHTML = `<div class="tr-grid">
+    <div class="board" id="plBoard"></div>
+    <div class="stack" style="min-width:0">
+      <div><h2>Jouer contre Stockfish</h2><p class="note" style="margin-top:4px">Entraîne-toi contre le moteur, depuis le début ou depuis une position de tes parties (bouton dans Analyse).</p></div>
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label for="plLevel">Niveau</label><select id="plLevel">${LEVELS.map((l, i) => `<option value="${i}" ${i === pl.level ? "selected" : ""}>${l.n}</option>`).join("")}</select></div>
+        <div class="field"><label for="plColor">Couleur</label><select id="plColor"><option value="w" ${pl.color === "w" ? "selected" : ""}>Blancs</option><option value="b" ${pl.color === "b" ? "selected" : ""}>Noirs</option><option value="r">Au hasard</option></select></div>
+        <button class="btn primary" id="plNew">Nouvelle partie</button>
+      </div>
+      <div class="fb ${over ? "ok" : ""}" role="status">${esc(playStatus())}</div>
+      <div class="cur-line">${hist.length ? esc(lineText(hist, startPly)) : '<span class="muted">Aucun coup joué.</span>'}</div>
+      <div class="row">
+        <button class="btn" id="plUndo" ${hist.length && !pl.thinking ? "" : "disabled"}>◀ Reprendre un coup</button>
+        <button class="btn" id="plAnalyse" ${hist.length >= 2 ? "" : "disabled"}>Analyser la partie</button>
+      </div>
+    </div></div>`;
+  drawPl();
+  $("#plBoard").addEventListener("click", e => { const b = e.target.closest("[data-sq]"); if (b) plTap.tap(b.dataset.sq); });
+  $("#plLevel").onchange = e => { pl.level = +e.target.value; ls.set("ce.level", pl.level); };
+  $("#plNew").onclick = () => { const v = $("#plColor").value; newPlay(v === "r" ? {random: true} : {color: v}); renderPlay(); };
+  $("#plUndo").onclick = () => { pl.c.undo(); if (pl.c.turn() !== pl.color && pl.c.history().length) pl.c.undo(); pl.last = null; pl.msg = ""; renderPlay(); };
+  $("#plAnalyse").onclick = () => {
+    const name = state.cc || state.li || "Toi", res = pl.c.in_checkmate() ? (pl.c.turn() === "w" ? "0-1" : "1-0") : pl.c.game_over() ? "1/2-1/2" : "*";
+    const c = new Chess(pl.startFen); for (const m of pl.c.history()) c.move(m);
+    c.header("Event", "Partie contre Stockfish", "White", pl.color === "w" ? name : "Stockfish", "Black", pl.color === "b" ? name : "Stockfish", "Result", res, "Date", new Date().toISOString().slice(0, 10).replace(/-/g, "."));
+    const g = makeGame(c.pgn(), {tc: "Contre Stockfish"});
+    if (!g) return;
+    g.temp = true; g.mine = pl.color; g.opening = "Partie contre Stockfish"; g.id = "tmp" + Date.now();
+    showGame(g, 0);
+  };
+}
+function drawPl(){ const b = $("#plBoard"); if (b) drawBoard(b, pl.c.fen(), {flip: pl.color === "b", last: pl.last, sel: plTap.sel, targets: plTap.targets()}); }
+function plMove(mv){
+  const m = pl.c.move({from: mv.from, to: mv.to, promotion: "q"}); if (!m) return;
+  pl.last = {from: m.from, to: m.to}; pl.msg = "";
+  renderPlay();
+  if (!pl.c.game_over()) engineReply();
+}
+async function engineReply(){
+  pl.thinking = true; if (state.tab === "play") renderPlay();
+  try{
+    await PlayEngine.init();
+    const L = LEVELS[pl.level], fen = pl.c.fen();
+    const u = await PlayEngine.bestMove(fen, L.skill, L.depth, L.mt);
+    if (u && pl.c.fen() === fen){ const m = pl.c.move({from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] || "q"}); if (m) pl.last = {from: m.from, to: m.to}; }
+  }catch(e){ pl.msg = "Le moteur n'a pas pu démarrer. Essaie avec un navigateur à jour."; }
+  pl.thinking = false; if (state.tab === "play") renderPlay();
+}
+
+/* ================= Badges et démarrage ================= */
+function updateBadges(){
+  _pzCache = null;
+  const n = realPuzzles().filter(z => !state.solved[z.key]).length + dueCards().length;
+  const b = $("#nTrain"); b.hidden = !n; b.textContent = n > 99 ? "99+" : n;
+  updateQueueOffer(); updateWho();
+}
+async function boot(){
+  const ex = makeGame(EXAMPLE_PGN, {example: true}); ex.analysis = ls.get("ce.example", null);
+  state.games = [ex]; state.cur = ex;
+  $("#ccUser").value = state.cc; $("#liUser").value = state.li;
+  $("#backupFold").hidden = IN_CLAUDE;
+  const sub = ls.get("ce.sub", null); if (sub) Object.assign(state.sub, sub);
+  setTab(ls.get("ce.tab", "games"));
+  updateBadges();
+  if (IN_CLAUDE) window.claude.use("sample").then(s => { if (s){ state.sample = s; if (["analyse", "progress"].includes(state.tab)) renderTab(); } }).catch(() => {});
+  await Store.init();
+  if (!IN_CLAUDE && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  try{
+    const saved = await Store.all();
+    const legacy = (ls.get("ce.games", []) || []).filter(g => g && g.pgn);
+    addGames(saved);
+    const ids = new Set(saved.map(g => g.id)), migrate = legacy.filter(g => !ids.has(g.id));
+    if (migrate.length){ addGames(migrate); await Store.putMany(migrate); }
+    state.reps = await Store.kvGet("reps", []) || [];
+    state.srs = await Store.kvGet("srs", {}) || {};
+    state.srsMeta = await Store.kvGet("srsMeta", {day: "", n: 0}) || {day: "", n: 0};
+    state.course = await Store.kvGet("course", {}) || {};
+  }catch(e){ console.warn(e); }
+  replayCache.clear(); _auto = null;
+  renderTab(); updateBadges();
+}
+if (typeof Chess === "undefined") document.querySelector(".wrap").insertAdjacentHTML("afterbegin", `<div class="panel">La bibliothèque d'échecs n'a pas pu se charger. Vérifie ta connexion et recharge la page.</div>`);
+else boot();
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>

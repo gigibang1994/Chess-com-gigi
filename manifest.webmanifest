@@ -1,0 +1,17 @@
+{
+  "name": "Carnet d'échecs",
+  "short_name": "Carnet",
+  "description": "Analyse tes parties Chess.com et Lichess, trouve tes lacunes et entraîne-toi.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12151b",
+  "theme_color": "#2949b8",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
